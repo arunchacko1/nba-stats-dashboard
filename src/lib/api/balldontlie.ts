@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { apiFetch } from "./client";
 import {
   type Game,
@@ -14,6 +15,14 @@ const teamListSchema = listResponse(teamSchema);
 const teamItemSchema = itemResponse(teamSchema);
 const playerListSchema = listResponse(playerSchema);
 const gameListSchema = listResponse(gameSchema);
+const gamePageSchema = z.object({
+  data: z.array(gameSchema),
+  meta: z.object({ next_cursor: z.number().nullish() }).optional(),
+});
+
+// Refresh windows are long because this data changes at most once a day and the
+// free tier is rate limited; the standings sweep alone is a dozen calls.
+const SIX_HOURS = 60 * 60 * 6;
 
 export async function getTeams(): Promise<Team[]> {
   const json = await apiFetch("/teams", { params: { per_page: 100 } });
@@ -60,4 +69,23 @@ export async function getGames(query: GameQuery = {}): Promise<Game[]> {
     },
   });
   return gameListSchema.parse(json).data;
+}
+
+// Pulls every game in a season by following the cursor. Used to reconstruct
+// standings, so the page caches the result for hours rather than per request.
+export async function getAllGames(season: number): Promise<Game[]> {
+  const games: Game[] = [];
+  let cursor: number | undefined;
+  // A full season is ~13 pages of 100; the cap is a guard against a runaway loop.
+  for (let page = 0; page < 25; page += 1) {
+    const json = await apiFetch("/games", {
+      params: { seasons: [season], per_page: 100, cursor },
+      revalidate: SIX_HOURS,
+    });
+    const { data, meta } = gamePageSchema.parse(json);
+    games.push(...data);
+    if (!meta?.next_cursor) break;
+    cursor = meta.next_cursor;
+  }
+  return games;
 }
