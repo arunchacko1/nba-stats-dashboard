@@ -1,47 +1,52 @@
 import { notFound } from "next/navigation";
-import type { Game, Player, Team } from "@/lib/api/schemas";
-import { getGames, getTeam, getTeamRoster } from "@/lib/api/balldontlie";
+import type { Game, Team } from "@/lib/api/schemas";
+import { getSeasonGames, getSeasonTeams, getTeamById } from "@/lib/seasonData";
 import { getShootingStats, type ShootingStat } from "@/lib/shooting";
-import { SEASON } from "@/lib/season";
 
-export const revalidate = 21600;
+export function generateStaticParams() {
+  return getSeasonTeams().map((team) => ({ id: String(team.id) }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const team = getTeamById(Number(id));
+  return {
+    title: team ? `${team.full_name} — NBA Shooting Dashboard` : "Team not found",
+  };
+}
 
 interface TeamData {
   team: Team;
-  roster: Player[];
   wins: number;
   losses: number;
   recent: Game[];
 }
 
-async function loadTeam(teamId: number): Promise<TeamData | null> {
-  try {
-    const [team, roster, games] = await Promise.all([
-      getTeam(teamId),
-      getTeamRoster(teamId),
-      getGames({ teamIds: [teamId], seasons: [SEASON], perPage: 100 }),
-    ]);
+function loadTeam(teamId: number): TeamData | null {
+  const team = getTeamById(teamId);
+  if (!team) return null;
 
-    let wins = 0;
-    let losses = 0;
-    for (const game of games) {
-      if (game.status !== "Final") continue;
-      const isHome = game.home_team.id === teamId;
-      const teamScore = isHome ? game.home_team_score : game.visitor_team_score;
-      const opponentScore = isHome ? game.visitor_team_score : game.home_team_score;
-      if (teamScore > opponentScore) wins += 1;
-      else losses += 1;
-    }
+  const games = getSeasonGames().filter(
+    (game) => game.home_team.id === teamId || game.visitor_team.id === teamId,
+  );
 
-    const recent = games
-      .filter((game) => game.status === "Final")
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 5);
-
-    return { team, roster, wins, losses, recent };
-  } catch {
-    return null;
+  let wins = 0;
+  let losses = 0;
+  for (const game of games) {
+    if (game.status !== "Final") continue;
+    const isHome = game.home_team.id === teamId;
+    const teamScore = isHome ? game.home_team_score : game.visitor_team_score;
+    const opponentScore = isHome ? game.visitor_team_score : game.home_team_score;
+    if (teamScore > opponentScore) wins += 1;
+    else losses += 1;
   }
+
+  const recent = games
+    .filter((game) => game.status === "Final")
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+
+  return { team, wins, losses, recent };
 }
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,18 +54,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const teamId = Number(id);
   if (!Number.isInteger(teamId) || teamId <= 0) notFound();
 
-  const data = await loadTeam(teamId);
-  if (!data) {
-    return (
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 text-sm text-zinc-400">
-        Couldn&apos;t load this team. Live team data needs{" "}
-        <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200">BALLDONTLIE_API_KEY</code>{" "}
-        to be set.
-      </div>
-    );
-  }
+  const data = loadTeam(teamId);
+  if (!data) notFound();
 
-  const { team, roster, wins, losses, recent } = data;
+  const { team, wins, losses, recent } = data;
   const leaders = getShootingStats()
     .players.filter((player) => player.team === team.full_name)
     .slice(0, 5);
@@ -101,23 +98,6 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           )}
         </section>
       </div>
-
-      <section>
-        <h2 className="mb-3 text-xl font-semibold tracking-tight">Roster</h2>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {roster.map((player) => (
-            <div
-              key={player.id}
-              className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-sm"
-            >
-              <span className="font-medium">
-                {player.first_name} {player.last_name}
-              </span>
-              <span className="text-zinc-500">{player.position || "—"}</span>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

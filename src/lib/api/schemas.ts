@@ -19,10 +19,13 @@ export const playerSchema = z.object({
   id: z.number(),
   first_name: z.string(),
   last_name: z.string(),
-  position: z.string(),
-  height: z.string(),
-  weight: z.string(),
-  jersey_number: z.string(),
+  // These can come back null for players with incomplete profiles. Only position
+  // is rendered (and it tolerates a blank), so the rest are kept nullable rather
+  // than dropping an otherwise-valid roster entry.
+  position: z.string().nullable(),
+  height: z.string().nullable(),
+  weight: z.string().nullable(),
+  jersey_number: z.string().nullable(),
   team: teamSchema,
 });
 export type Player = z.infer<typeof playerSchema>;

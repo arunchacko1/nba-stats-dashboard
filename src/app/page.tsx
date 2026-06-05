@@ -1,53 +1,43 @@
 import Link from "next/link";
 import type { Game } from "@/lib/api/schemas";
-import { getAllGames, getTeams } from "@/lib/api/balldontlie";
+import { getCapturedAt, getSeasonGames, getSeasonTeams } from "@/lib/seasonData";
 import { getShootingStats } from "@/lib/shooting";
-import { SEASON, SEASON_LABEL } from "@/lib/season";
-import { deriveStandings, type Standings, type TeamRecord } from "@/lib/standings";
+import { SEASON_LABEL } from "@/lib/season";
+import { deriveStandings, type TeamRecord } from "@/lib/standings";
 
-export const revalidate = 21600;
-
-async function loadLiveData(): Promise<{ standings: Standings; recent: Game[] } | null> {
-  try {
-    const [games, teams] = await Promise.all([getAllGames(SEASON), getTeams()]);
-    const recent = games
-      .filter((game) => game.status === "Final")
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 10);
-    return { standings: deriveStandings(games, teams), recent };
-  } catch {
-    return null;
-  }
-}
-
-export default async function HomePage() {
-  const live = await loadLiveData();
+export default function HomePage() {
+  const games = getSeasonGames();
+  const standings = deriveStandings(games, getSeasonTeams());
+  const recent = games
+    .filter((game) => game.status === "Final")
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 10);
   const leaders = getShootingStats().players.slice(0, 8);
+  const captured = new Date(getCapturedAt()).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <div className="space-y-10">
       <section>
         <h1 className="text-3xl font-bold tracking-tight">{SEASON_LABEL} NBA Shooting Dashboard</h1>
         <p className="mt-2 max-w-2xl text-zinc-400">
-          Standings and scores from the live balldontlie API, alongside shooting splits and D3 shot
-          charts built from a full season of shot-location data.
+          Final {SEASON_LABEL} standings and scores from balldontlie, alongside shooting splits and
+          D3 shot charts built from a full season of shot-location data.
         </p>
+        <p className="mt-1 text-xs text-zinc-500">Season data captured {captured}.</p>
       </section>
 
-      {live ? (
-        <>
-          <section className="grid gap-6 lg:grid-cols-2">
-            <StandingsCard title="Eastern Conference" rows={live.standings.east} />
-            <StandingsCard title="Western Conference" rows={live.standings.west} />
-          </section>
-          <section>
-            <SectionHeading>Recent Scores</SectionHeading>
-            <ScoreGrid games={live.recent} />
-          </section>
-        </>
-      ) : (
-        <ApiKeyNotice />
-      )}
+      <section className="grid gap-6 lg:grid-cols-2">
+        <StandingsCard title="Eastern Conference" rows={standings.east} />
+        <StandingsCard title="Western Conference" rows={standings.west} />
+      </section>
+      <section>
+        <SectionHeading>Recent Scores</SectionHeading>
+        <ScoreGrid games={recent} />
+      </section>
 
       <section>
         <div className="flex items-baseline justify-between">
@@ -151,20 +141,6 @@ function ScoreRow({ team, score, winner }: { team: string; score: number; winner
     <div className={`flex justify-between ${winner ? "font-semibold" : "text-zinc-400"}`}>
       <span>{team}</span>
       <span className="tabular-nums">{score}</span>
-    </div>
-  );
-}
-
-function ApiKeyNotice() {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 text-sm text-zinc-400">
-      <p className="font-medium text-zinc-200">Live standings and scores are unavailable.</p>
-      <p className="mt-1">
-        Set{" "}
-        <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200">BALLDONTLIE_API_KEY</code>{" "}
-        (a free key from balldontlie.io) to enable them. The shooting stats and shot charts work
-        without it.
-      </p>
     </div>
   );
 }
