@@ -4,13 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ShotChart } from "@/components/ShotChart";
 import { fetchPlayerShots, fetchShotPlayers, type Shot, type ShotPlayerSummary } from "@/lib/shots";
 
-type Status = "loading" | "ready" | "error";
-
 export function ShotExplorer() {
   const [players, setPlayers] = useState<ShotPlayerSummary[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [shots, setShots] = useState<Shot[]>([]);
-  const [status, setStatus] = useState<Status>("loading");
+  const [loaded, setLoaded] = useState<{ id: string; shots: Shot[] } | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -20,7 +18,7 @@ export function ShotExplorer() {
         setPlayers(list);
         setSelectedId(list[0]?.id ?? "");
       })
-      .catch(() => active && setStatus("error"));
+      .catch(() => active && setFailed(true));
     return () => {
       active = false;
     };
@@ -29,18 +27,20 @@ export function ShotExplorer() {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    setStatus("loading");
     fetchPlayerShots(selectedId)
-      .then((loaded) => {
-        if (!active) return;
-        setShots(loaded);
-        setStatus("ready");
-      })
-      .catch(() => active && setStatus("error"));
+      .then((shots) => active && setLoaded({ id: selectedId, shots }))
+      .catch(() => active && setFailed(true));
     return () => {
       active = false;
     };
   }, [selectedId]);
+
+  // Loading is derived: the loaded shots belong to the current player or they don't.
+  const shots = useMemo(
+    () => (loaded?.id === selectedId ? loaded.shots : []),
+    [loaded, selectedId],
+  );
+  const isLoading = !failed && loaded?.id !== selectedId;
 
   const summary = useMemo(() => {
     if (shots.length === 0) return null;
@@ -48,7 +48,7 @@ export function ShotExplorer() {
     return { attempts: shots.length, made, pct: (made / shots.length) * 100 };
   }, [shots]);
 
-  if (status === "error") {
+  if (failed) {
     return <p className="text-sm text-red-400">Couldn&apos;t load shot data. Try reloading.</p>;
   }
 
@@ -82,7 +82,7 @@ export function ShotExplorer() {
       </div>
 
       <div className="flex-1">
-        {status === "loading" && shots.length === 0 ? (
+        {isLoading ? (
           <p className="text-sm text-zinc-400">Loading shots…</p>
         ) : (
           <ShotChart shots={shots} />

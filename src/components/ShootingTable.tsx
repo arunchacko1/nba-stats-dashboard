@@ -41,6 +41,9 @@ export function ShootingTable({ players }: { players: ShootingStat[] }) {
 
   const data = useMemo(() => filterPlayers(players, query), [players, query]);
 
+  // TanStack's useReactTable manages its own memoization, which the React Compiler
+  // lint rule doesn't recognize. This is the documented way to opt it out.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,
