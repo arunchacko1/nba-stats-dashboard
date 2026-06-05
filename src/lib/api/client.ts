@@ -1,9 +1,12 @@
 const BASE_URL = "https://api.balldontlie.io/v1";
 
 // balldontlie's free tier caps out around a handful of requests per minute and
-// answers with 429 + Retry-After when you cross it. We honor that header once
-// rather than failing the whole page render on a transient throttle.
-const MAX_RETRY_DELAY_MS = 5_000;
+// answers with 429 + Retry-After (observed up to ~60s) when you cross it. A
+// multi-page sweep — e.g. reconstructing standings from a full season — trips
+// this repeatedly, so we honor the header through several throttles rather than
+// failing the whole render. Bounded so a misbehaving endpoint can't hang a build.
+const MAX_RETRY_DELAY_MS = 60_000;
+const MAX_ATTEMPTS = 6;
 const DEFAULT_REVALIDATE_SECONDS = 3600;
 
 export class ApiError extends Error {
@@ -51,12 +54,14 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   let response = await fetch(url, init);
 
-  if (response.status === 429) {
+  // Retry through repeated throttling for as long as the server keeps telling us
+  // how long to wait, up to a bounded number of attempts. A 429 without a usable
+  // Retry-After is treated as terminal — we have nothing to back off on.
+  for (let attempt = 1; response.status === 429 && attempt < MAX_ATTEMPTS; attempt += 1) {
     const delayMs = parseRetryAfter(response.headers.get("retry-after"));
-    if (delayMs !== null) {
-      await sleep(delayMs);
-      response = await fetch(url, init);
-    }
+    if (delayMs === null) break;
+    await sleep(delayMs);
+    response = await fetch(url, init);
   }
 
   if (!response.ok) {

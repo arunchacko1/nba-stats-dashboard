@@ -60,6 +60,34 @@ describe("apiFetch", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("retries through several consecutive 429s while Retry-After is present", async () => {
+    vi.stubEnv("BALLDONTLIE_API_KEY", "secret-key");
+    const throttled = () => new Response(null, { status: 429, headers: { "retry-after": "0" } });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(throttled())
+      .mockResolvedValueOnce(throttled())
+      .mockResolvedValueOnce(throttled())
+      .mockResolvedValueOnce(jsonResponse({ data: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiFetch("/games");
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("gives up after a bounded number of throttled attempts", async () => {
+    vi.stubEnv("BALLDONTLIE_API_KEY", "secret-key");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 429, headers: { "retry-after": "0" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiFetch("/games")).rejects.toMatchObject({ status: 429 });
+    // One initial call plus a bounded set of retries — not an unbounded loop.
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
   it("does not retry a 429 without a Retry-After header", async () => {
     vi.stubEnv("BALLDONTLIE_API_KEY", "secret-key");
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 429 }));
