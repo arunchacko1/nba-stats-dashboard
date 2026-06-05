@@ -61,7 +61,10 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     const delayMs = parseRetryAfter(response.headers.get("retry-after"));
     if (delayMs === null) break;
     await sleep(delayMs);
-    response = await fetch(url, init);
+    // Vary the URL per attempt so Next's per-render request memoization actually
+    // re-hits the network instead of replaying the cached 429 we're backing off
+    // from. balldontlie ignores the extra param.
+    response = await fetch(retryUrl(url, attempt), init);
   }
 
   if (!response.ok) {
@@ -69,6 +72,10 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   return (await response.json()) as T;
+}
+
+function retryUrl(url: string, attempt: number): string {
+  return `${url}${url.includes("?") ? "&" : "?"}_retry=${attempt}`;
 }
 
 function parseRetryAfter(header: string | null): number | null {

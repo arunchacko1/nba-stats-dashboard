@@ -58,6 +58,11 @@ describe("apiFetch", () => {
     await apiFetch("/standings");
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The retry must vary the URL so Next's request memoization re-hits the network.
+    const [firstUrl] = fetchMock.mock.calls[0];
+    const [secondUrl] = fetchMock.mock.calls[1];
+    expect(firstUrl).not.toContain("_retry");
+    expect(secondUrl).toContain("_retry=1");
   });
 
   it("retries through several consecutive 429s while Retry-After is present", async () => {
