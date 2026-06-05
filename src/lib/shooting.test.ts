@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getShootingStats } from "./shooting";
+import { filterPlayers, getShootingStats, type ShootingStat } from "./shooting";
 
 // These run against the committed ETL output, so they double as a guard that the
 // generated dataset stays internally consistent if the build script changes.
@@ -36,3 +36,48 @@ describe("shooting dataset", () => {
     }
   });
 });
+
+describe("filterPlayers", () => {
+  const sample: ShootingStat[] = [
+    makeStat({ name: "Stephen Curry", team: "Golden State Warriors" }),
+    makeStat({ name: "Klay Thompson", team: "Dallas Mavericks" }),
+    makeStat({ name: "Luka Dončić", team: "Dallas Mavericks" }),
+  ];
+
+  it("returns everyone when the query is blank or whitespace", () => {
+    expect(filterPlayers(sample, "")).toHaveLength(3);
+    expect(filterPlayers(sample, "   ")).toHaveLength(3);
+  });
+
+  it("matches on player name, case-insensitively", () => {
+    const result = filterPlayers(sample, "curry");
+    expect(result.map((p) => p.name)).toEqual(["Stephen Curry"]);
+  });
+
+  it("matches on team name", () => {
+    const result = filterPlayers(sample, "dallas");
+    expect(result).toHaveLength(2);
+  });
+
+  it("returns nothing when nothing matches", () => {
+    expect(filterPlayers(sample, "celtics")).toHaveLength(0);
+  });
+});
+
+function makeStat(overrides: Partial<ShootingStat>): ShootingStat {
+  return {
+    id: "1",
+    name: "Player",
+    team: "Team",
+    games: 70,
+    fga: 1000,
+    fgm: 500,
+    fgPct: 50,
+    fg3a: 300,
+    fg3m: 120,
+    fg3Pct: 40,
+    pointsPerGame: 12,
+    fgaPerGame: 14,
+    ...overrides,
+  };
+}

@@ -1,0 +1,110 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from "@tanstack/react-table";
+import { filterPlayers, type ShootingStat } from "@/lib/shooting";
+
+const columnHelper = createColumnHelper<ShootingStat>();
+
+const columns = [
+  columnHelper.accessor("name", { header: "Player", enableSorting: true }),
+  columnHelper.accessor("team", { header: "Team", enableSorting: true }),
+  columnHelper.accessor("games", { header: "GP" }),
+  columnHelper.accessor("pointsPerGame", { header: "FG Pts/G" }),
+  columnHelper.accessor("fgaPerGame", { header: "FGA/G" }),
+  columnHelper.accessor("fgPct", { header: "FG%", cell: (c) => c.getValue().toFixed(1) }),
+  columnHelper.accessor("fg3m", { header: "3PM" }),
+  columnHelper.accessor("fg3a", { header: "3PA" }),
+  columnHelper.accessor("fg3Pct", { header: "3P%", cell: (c) => c.getValue().toFixed(1) }),
+];
+
+const numericColumns = new Set([
+  "games",
+  "pointsPerGame",
+  "fgaPerGame",
+  "fgPct",
+  "fg3m",
+  "fg3a",
+  "fg3Pct",
+]);
+
+export function ShootingTable({ players }: { players: ShootingStat[] }) {
+  const [query, setQuery] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([{ id: "pointsPerGame", desc: true }]);
+
+  const data = useMemo(() => filterPlayers(players, query), [players, query]);
+
+  const table = useReactTable({
+    data,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  return (
+    <div>
+      <input
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Filter by player or team"
+        className="mb-4 w-full max-w-xs rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+      />
+      <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <table className="w-full text-sm">
+          <thead className="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-400">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const sorted = header.column.getIsSorted();
+                  return (
+                    <th
+                      key={header.id}
+                      onClick={header.column.getToggleSortingHandler()}
+                      className={`px-3 py-3 font-semibold select-none ${
+                        numericColumns.has(header.column.id) ? "text-right" : "text-left"
+                      } ${header.column.getCanSort() ? "cursor-pointer hover:text-white" : ""}`}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr key={row.id} className="border-t border-zinc-800 hover:bg-zinc-900/60">
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className={`px-3 py-2 ${
+                      numericColumns.has(cell.column.id)
+                        ? "text-right tabular-nums text-zinc-300"
+                        : "text-zinc-100"
+                    }`}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {data.length === 0 && (
+        <p className="mt-4 text-sm text-zinc-500">No players match &ldquo;{query}&rdquo;.</p>
+      )}
+    </div>
+  );
+}

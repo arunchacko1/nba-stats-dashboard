@@ -32,3 +32,13 @@ export function getShootingStats(): ShootingDataset {
   if (!cached) cached = datasetSchema.parse(raw);
   return cached;
 }
+
+export function filterPlayers(players: ShootingStat[], query: string): ShootingStat[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length === 0) return players;
+  return players.filter(
+    (player) =>
+      player.name.toLowerCase().includes(normalized) ||
+      player.team.toLowerCase().includes(normalized),
+  );
+}
