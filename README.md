@@ -10,7 +10,8 @@ of shot-location data.
 
 - **Standings & scores** reconstructed from the live [balldontlie](https://www.balldontlie.io/) API.
 - **Shooting stats table** — 300+ players, sortable on any column and filterable by
-  player or team (TanStack Table).
+  player or team (TanStack Table). Each player links to a **detail page** with their
+  shooting splits and, for featured players, an inline shot chart.
 - **Shot charts** — every field-goal attempt for a featured player, binned into a
   hexagonal density map on an SVG court (hexagon size = shot frequency, color = make rate).
 - **Team pages** — roster, season record, recent games, and the team's shooting leaders.
@@ -82,8 +83,8 @@ the chart's hexbin rendering.
 
 ```
 src/
-  app/                 routes: home, /players, /shot-chart, /teams/[id]
-  components/          ShootingTable, ShotChart, CourtMarkings, ShotExplorer, SiteHeader
+  app/                 routes: home, /players, /players/[id], /shot-chart, /teams/[id]
+  components/          ShootingTable, ShotChart, CourtMarkings, ShotExplorer, PlayerShotChart, SiteHeader
   lib/
     api/               balldontlie client, typed functions, Zod schemas
     court.ts           half-court geometry + coordinate transform

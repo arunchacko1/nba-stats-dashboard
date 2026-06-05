@@ -33,6 +33,10 @@ export function getShootingStats(): ShootingDataset {
   return cached;
 }
 
+export function getPlayerById(id: string): ShootingStat | null {
+  return getShootingStats().players.find((player) => player.id === id) ?? null;
+}
+
 export function filterPlayers(players: ShootingStat[], query: string): ShootingStat[] {
   const normalized = query.trim().toLowerCase();
   if (normalized.length === 0) return players;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterPlayers, getShootingStats, type ShootingStat } from "./shooting";
+import { filterPlayers, getPlayerById, getShootingStats, type ShootingStat } from "./shooting";
 
 // These run against the committed ETL output, so they double as a guard that the
 // generated dataset stays internally consistent if the build script changes.
@@ -34,6 +34,19 @@ describe("shooting dataset", () => {
       const expected = Math.round((points / player.games) * 10) / 10;
       expect(player.pointsPerGame).toBeCloseTo(expected, 5);
     }
+  });
+});
+
+describe("getPlayerById", () => {
+  const { players } = getShootingStats();
+
+  it("returns the matching player for a real id", () => {
+    const target = players[0];
+    expect(getPlayerById(target.id)).toEqual(target);
+  });
+
+  it("returns null when no player has the id", () => {
+    expect(getPlayerById("not-a-real-id")).toBeNull();
   });
 });
 

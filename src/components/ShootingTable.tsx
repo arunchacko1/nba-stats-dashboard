@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   createColumnHelper,
   flexRender,
@@ -14,7 +15,18 @@ import { filterPlayers, type ShootingStat } from "@/lib/shooting";
 const columnHelper = createColumnHelper<ShootingStat>();
 
 const columns = [
-  columnHelper.accessor("name", { header: "Player", enableSorting: true }),
+  columnHelper.accessor("name", {
+    header: "Player",
+    enableSorting: true,
+    cell: (c) => (
+      <Link
+        href={`/players/${c.row.original.id}`}
+        className="font-medium text-zinc-100 underline-offset-2 hover:text-white hover:underline"
+      >
+        {c.getValue()}
+      </Link>
+    ),
+  }),
   columnHelper.accessor("team", { header: "Team", enableSorting: true }),
   columnHelper.accessor("games", { header: "GP" }),
   columnHelper.accessor("pointsPerGame", { header: "FG Pts/G" }),
