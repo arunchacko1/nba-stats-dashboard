@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "NBA Shooting Dashboard",
-  description: "Interactive 2024-25 NBA shooting stats and D3 shot charts.",
+  description: "Live 2025-26 NBA standings and scores with 2024-25 shooting stats and D3 shot charts.",
 };
 
 export default function RootLayout({

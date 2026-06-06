@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getCapturedAt, getSeasonGames, getSeasonTeams, getTeamById } from "./seasonData";
+import { getCapturedAt, getSnapshotGames, getSnapshotTeams, getTeamById } from "./seasonData";
 import { deriveStandings } from "./standings";
 
 // Runs against the committed snapshot, so it doubles as a guard that the ETL
 // output stays internally consistent and complete.
 describe("season snapshot", () => {
-  const teams = getSeasonTeams();
-  const games = getSeasonGames();
+  const teams = getSnapshotTeams();
+  const games = getSnapshotGames();
 
   it("captures all 30 teams, evenly split across conferences", () => {
     expect(teams).toHaveLength(30);

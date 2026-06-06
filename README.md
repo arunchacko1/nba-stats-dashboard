@@ -1,14 +1,14 @@
 # NBA Shooting Dashboard
 
-An interactive dashboard for the 2024-25 NBA season: live standings and scores, a
-sortable shooting-stats table, and D3 hexbin shot charts built from a full season
-of shot-location data.
+An interactive NBA dashboard: live 2025-26 standings and scores, a sortable
+shooting-stats table, and D3 hexbin shot charts built from a full season of
+2024-25 shot-location data.
 
 ![Shot chart](docs/shot-chart.png)
 
 ## Features
 
-- **Standings & scores** reconstructed from a committed snapshot of the [balldontlie](https://www.balldontlie.io/) API.
+- **Standings & scores** for the live 2025-26 season from the [balldontlie](https://www.balldontlie.io/) API, with a committed snapshot as a fallback.
 - **Shooting stats table** — 300+ players, sortable on any column and filterable by
   player or team (TanStack Table). Each player links to a **detail page** with their
   shooting splits and, for featured players, an inline shot chart.
@@ -28,24 +28,26 @@ data. The obvious source, `stats.nba.com`, silently drops requests from datacent
 IPs, so anything deployed to a serverless host can't reach it. The dashboard avoids
 that entirely:
 
-- **Team & game data (balldontlie, snapshotted):** teams and the full season game log. The free tier also blocks datacenter IPs, so the deployed app can't
-  call it directly either. Instead a build step (`npm run build:live`) runs off-platform,
-  uses the resilient API client to pull the season once, and commits the result as
-  `src/data/season-snapshot.json`. The free tier has no standings endpoint, so standings
-  are **derived** from the snapshot's finished games (`src/lib/standings.ts`).
+- **Team & game data (balldontlie, live with fallback):** the home and team pages
+  fetch the 2025-26 teams and full game log live and cache them with ISR (`getSeasonData`
+  in `src/lib/seasonData.ts`). The free tier is heavily rate limited and can be
+  unreachable from a datacenter IP, so every live read falls back to a committed
+  snapshot of the same season — built off-platform with `npm run build:live` and stored
+  at `src/data/season-snapshot.json`. The page renders current-season data either way.
+  The free tier has no standings endpoint, so standings are **derived** from finished
+  games (`src/lib/standings.ts`).
 - **Shot data (committed):** the shooting table and shot charts come from a published
   season shot log. A build step (`npm run build:data`) downloads it, aggregates
   per-player shooting splits, and carves out per-player shot maps, writing JSON that
-  ships with the app.
-
-The 2024-25 season is complete, so both snapshots are final and the deployed site
-never depends on an external host at request time.
+  ships with the app. The shot log lags a season behind the live feed, so it covers
+  **2024-25** — labelled as such throughout, distinct from the live 2025-26 standings.
 
 **Resilience over a flaky free tier.** The API client (`src/lib/api/client.ts`)
 injects auth, validates responses with Zod at the boundary, and waits out the free
 tier's aggressive rate limiting — honoring `Retry-After` through repeated 429s so a
-multi-page sweep completes. That client powers the build-time ETL rather than the
-request path, so production has no runtime dependency on the API.
+multi-page sweep completes. The same client powers both the request path (ISR-cached,
+hourly) and the off-platform snapshot ETL, so a throttled or blocked live fetch
+degrades to committed data instead of failing the render.
 
 **D3 for math, React for the DOM.** The shot chart uses D3 only to compute the
 hexbin layout and scales; the SVG itself is rendered as plain React elements. That
@@ -69,8 +71,9 @@ npm run build:live   # standings, scores, team pages
 npm run dev
 ```
 
-Open http://localhost:3000. The app is served entirely from committed data, so it
-needs no API key or network access to run.
+Open http://localhost:3000. With a `BALLDONTLIE_API_KEY` set, standings and scores
+are fetched live; without one (or if the API is unreachable) the app falls back to
+the committed snapshot, so it always renders.
 
 ## Testing
 
@@ -93,7 +96,7 @@ src/
     court.ts           half-court geometry + coordinate transform
     standings.ts       standings derived from games
     shooting.ts        loader for the aggregated shooting data
-    seasonData.ts      loader for the committed season snapshot
+    seasonData.ts      live season data (balldontlie) with snapshot fallback
     shots.ts           loaders for per-player shot maps
   data/                generated shooting-stats.json, season-snapshot.json
 scripts/

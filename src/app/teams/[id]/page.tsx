@@ -1,10 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Game, Team } from "@/lib/api/schemas";
-import { getSeasonGames, getSeasonTeams, getTeamById } from "@/lib/seasonData";
+import { getSeasonData, getSnapshotTeams, getTeamById } from "@/lib/seasonData";
 import { getShootingStats, type ShootingStat } from "@/lib/shooting";
 
+// Refresh each team's live record/recent games hourly, matching the home page.
+export const revalidate = 3600;
+
+// The 30 teams are stable for the season, so prerender the routes from the
+// snapshot rather than spending a live call just to enumerate ids.
 export function generateStaticParams() {
-  return getSeasonTeams().map((team) => ({ id: String(team.id) }));
+  return getSnapshotTeams().map((team) => ({ id: String(team.id) }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -22,18 +27,16 @@ interface TeamData {
   recent: Game[];
 }
 
-function loadTeam(teamId: number): TeamData | null {
-  const team = getTeamById(teamId);
-  if (!team) return null;
-
-  const games = getSeasonGames().filter(
+function loadTeam(teamId: number, team: Team, allGames: Game[]): TeamData {
+  const games = allGames.filter(
     (game) => game.home_team.id === teamId || game.visitor_team.id === teamId,
   );
 
+  // Regular-season record only, matching the standings on the home page.
   let wins = 0;
   let losses = 0;
   for (const game of games) {
-    if (game.status !== "Final") continue;
+    if (game.status !== "Final" || game.postseason) continue;
     const isHome = game.home_team.id === teamId;
     const teamScore = isHome ? game.home_team_score : game.visitor_team_score;
     const opponentScore = isHome ? game.visitor_team_score : game.home_team_score;
@@ -54,10 +57,11 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const teamId = Number(id);
   if (!Number.isInteger(teamId) || teamId <= 0) notFound();
 
-  const data = loadTeam(teamId);
-  if (!data) notFound();
+  const { teams, games } = await getSeasonData();
+  const team = teams.find((t) => t.id === teamId) ?? getTeamById(teamId);
+  if (!team) notFound();
 
-  const { team, wins, losses, recent } = data;
+  const { wins, losses, recent } = loadTeam(teamId, team, games);
   const leaders = getShootingStats()
     .players.filter((player) => player.team === team.full_name)
     .slice(0, 5);

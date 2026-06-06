@@ -24,12 +24,14 @@ function game(
   homeScore: number,
   awayScore: number,
   status = "Final",
+  postseason = false,
 ): Game {
   return {
     id: Math.random(),
     date: "2025-01-01",
-    season: 2024,
+    season: 2025,
     status,
+    postseason,
     home_team: home,
     visitor_team: away,
     home_team_score: homeScore,
@@ -55,6 +57,12 @@ describe("deriveStandings", () => {
 
   it("ignores games that are not final", () => {
     const { east } = deriveStandings([game(celtics, heat, 50, 40, "1st Qtr")], teams);
+    expect(east.every((r) => r.wins === 0 && r.losses === 0)).toBe(true);
+  });
+
+  it("excludes postseason games — standings are regular-season only", () => {
+    const playoff = game(celtics, heat, 110, 100, "Final", true);
+    const { east } = deriveStandings([playoff], teams);
     expect(east.every((r) => r.wins === 0 && r.losses === 0)).toBe(true);
   });
 

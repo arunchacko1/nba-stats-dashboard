@@ -35,6 +35,10 @@ export const gameSchema = z.object({
   date: z.string(),
   season: z.number(),
   status: z.string(),
+  // Playoff games carry postseason: true. Standings are regular-season only, so
+  // we keep the flag to filter them out. Defaults to false for fixtures and any
+  // source that omits it.
+  postseason: z.boolean().default(false),
   home_team: teamSchema,
   visitor_team: teamSchema,
   home_team_score: z.number(),

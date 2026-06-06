@@ -1,17 +1,14 @@
-// Build-time ETL for the live-data half of the dashboard.
+// Builds the committed season snapshot that backs the live data in src/lib/seasonData.ts.
 //
-// balldontlie's free tier refuses requests from datacenter IPs (the same way
-// stats.nba.com does), so the deployed app can't reach it from Vercel. Rather
-// than ship a half-working "live" page, we snapshot the season once from a
-// normal network — reusing the resilient API client in src/lib/api — and commit
-// the result. The app then reads only committed JSON, exactly like the shot data.
-//
-// The 2024-25 season is complete, so this snapshot is final; re-run it only if
-// you want to rebuild against the source.
+// The dashboard fetches standings and scores live from balldontlie, but the free
+// tier is heavily rate limited and can be unreachable from a datacenter IP (the
+// same way stats.nba.com is). So every live read falls back to this snapshot — a
+// full capture of the season's teams and games — to guarantee the deployed app
+// always renders current-season data. Re-run it to refresh the fallback.
 //
 //   BALLDONTLIE_API_KEY=... npm run build:live
 //
-// Run off-platform (a normal IP); it cannot succeed from a datacenter host.
+// Run off-platform (a normal IP); the rate-limited season sweep is reliable there.
 
 import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";

@@ -1,19 +1,23 @@
 import Link from "next/link";
 import type { Game } from "@/lib/api/schemas";
-import { getCapturedAt, getSeasonGames, getSeasonTeams } from "@/lib/seasonData";
+import { getSeasonData } from "@/lib/seasonData";
 import { getShootingStats } from "@/lib/shooting";
-import { SEASON_LABEL } from "@/lib/season";
+import { SEASON_LABEL, SHOOTING_SEASON_LABEL } from "@/lib/season";
 import { deriveStandings, type TeamRecord } from "@/lib/standings";
 
-export default function HomePage() {
-  const games = getSeasonGames();
-  const standings = deriveStandings(games, getSeasonTeams());
+// Re-pull the live standings/scores hourly; the snapshot fallback keeps the page
+// rendering current-season data in between, or if the live fetch is unavailable.
+export const revalidate = 3600;
+
+export default async function HomePage() {
+  const { games, teams, live, capturedAt } = await getSeasonData();
+  const standings = deriveStandings(games, teams);
   const recent = games
     .filter((game) => game.status === "Final")
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 10);
   const leaders = getShootingStats().players.slice(0, 8);
-  const captured = new Date(getCapturedAt()).toLocaleDateString("en-US", {
+  const captured = new Date(capturedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -24,10 +28,14 @@ export default function HomePage() {
       <section>
         <h1 className="text-3xl font-bold tracking-tight">{SEASON_LABEL} NBA Shooting Dashboard</h1>
         <p className="mt-2 max-w-2xl text-zinc-400">
-          Final {SEASON_LABEL} standings and scores from balldontlie, alongside shooting splits and
-          D3 shot charts built from a full season of shot-location data.
+          Live {SEASON_LABEL} standings and scores from balldontlie, alongside {SHOOTING_SEASON_LABEL}{" "}
+          shooting splits and D3 shot charts built from a full season of shot-location data.
         </p>
-        <p className="mt-1 text-xs text-zinc-500">Season data captured {captured}.</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          {live
+            ? "Standings and scores updated live from balldontlie."
+            : `Showing the committed snapshot captured ${captured}.`}
+        </p>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
@@ -59,7 +67,7 @@ export default function HomePage() {
           ))}
         </ol>
         <p className="mt-2 text-xs text-zinc-500">
-          Field-goal points per game (excludes free throws).
+          {SHOOTING_SEASON_LABEL} field-goal points per game (excludes free throws).
         </p>
       </section>
     </div>
