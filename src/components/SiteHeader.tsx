@@ -5,6 +5,7 @@ const links = [
   { href: "/players", label: "Shooting Stats" },
   { href: "/leaderboards", label: "Leaderboards" },
   { href: "/shot-chart", label: "Shot Charts" },
+  { href: "/compare", label: "Compare" },
 ];
 
 export function SiteHeader() {
