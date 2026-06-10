@@ -15,10 +15,28 @@ export const shootingStatSchema = z.object({
   fg3a: z.number(),
   fg3m: z.number(),
   fg3Pct: z.number(),
+  fta: z.number(),
+  ftm: z.number(),
+  ftPct: z.number(),
+  points: z.number(),
   pointsPerGame: z.number(),
   fgaPerGame: z.number(),
 });
 export type ShootingStat = z.infer<typeof shootingStatSchema>;
+
+// Effective field-goal % credits the extra point a three is worth.
+export function efgPct(player: ShootingStat): number {
+  if (player.fga === 0) return 0;
+  return ((player.fgm + 0.5 * player.fg3m) / player.fga) * 100;
+}
+
+// True-shooting % measures scoring efficiency across twos, threes, and free
+// throws; the 0.44 weights the free-throw attempts that don't end a possession.
+export function tsPct(player: ShootingStat): number {
+  const shootingPossessions = player.fga + 0.44 * player.fta;
+  if (shootingPossessions === 0) return 0;
+  return (player.points / (2 * shootingPossessions)) * 100;
+}
 
 const datasetSchema = z.object({
   season: z.string(),

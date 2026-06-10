@@ -126,6 +126,11 @@ function aggregatePlayers(byathlete, teamNames) {
         fg3a: stat(entry, "offensive", "threePointFieldGoalsAttempted"),
         fg3m: stat(entry, "offensive", "threePointFieldGoalsMade"),
         fg3Pct: round(stat(entry, "offensive", "threePointFieldGoalPct")),
+        fta: stat(entry, "offensive", "freeThrowsAttempted"),
+        ftm: stat(entry, "offensive", "freeThrowsMade"),
+        ftPct: round(stat(entry, "offensive", "freeThrowPct")),
+        // Total points feed true-shooting / effective-FG% calculations downstream.
+        points: stat(entry, "offensive", "points"),
         // ESPN's avgPoints is true points per game (includes free throws), unlike
         // the old shot-log source that only knew about field goals.
         pointsPerGame: round(stat(entry, "offensive", "avgPoints")),

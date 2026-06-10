@@ -10,7 +10,7 @@ import {
   useReactTable,
   type SortingState,
 } from "@tanstack/react-table";
-import { filterPlayers, teamOptions, type ShootingStat } from "@/lib/shooting";
+import { efgPct, filterPlayers, teamOptions, tsPct, type ShootingStat } from "@/lib/shooting";
 
 const columnHelper = createColumnHelper<ShootingStat>();
 
@@ -35,6 +35,17 @@ const columns = [
   columnHelper.accessor("fg3m", { header: "3PM" }),
   columnHelper.accessor("fg3a", { header: "3PA" }),
   columnHelper.accessor("fg3Pct", { header: "3P%", cell: (c) => c.getValue().toFixed(1) }),
+  columnHelper.accessor("ftPct", { header: "FT%", cell: (c) => c.getValue().toFixed(1) }),
+  columnHelper.accessor((row) => efgPct(row), {
+    id: "efgPct",
+    header: "eFG%",
+    cell: (c) => c.getValue<number>().toFixed(1),
+  }),
+  columnHelper.accessor((row) => tsPct(row), {
+    id: "tsPct",
+    header: "TS%",
+    cell: (c) => c.getValue<number>().toFixed(1),
+  }),
 ];
 
 const numericColumns = new Set([
@@ -45,6 +56,9 @@ const numericColumns = new Set([
   "fg3m",
   "fg3a",
   "fg3Pct",
+  "ftPct",
+  "efgPct",
+  "tsPct",
 ]);
 
 export function ShootingTable({ players }: { players: ShootingStat[] }) {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  efgPct,
   filterPlayers,
   getPlayerById,
   getShootingStats,
   teamOptions,
+  tsPct,
   type ShootingStat,
 } from "./shooting";
 
@@ -101,6 +103,28 @@ describe("filterPlayers", () => {
   });
 });
 
+describe("efgPct", () => {
+  it("credits the extra point a three is worth", () => {
+    // (400 makes + half of 100 threes) / 1000 attempts
+    expect(efgPct(makeStat({ fgm: 400, fg3m: 100, fga: 1000 }))).toBeCloseTo(45, 5);
+  });
+
+  it("is zero with no field-goal attempts", () => {
+    expect(efgPct(makeStat({ fga: 0 }))).toBe(0);
+  });
+});
+
+describe("tsPct", () => {
+  it("weights free-throw attempts by 0.44", () => {
+    const player = makeStat({ points: 500, fga: 400, fta: 100 });
+    expect(tsPct(player)).toBeCloseTo((500 / (2 * (400 + 44))) * 100, 5);
+  });
+
+  it("is zero with no shooting possessions", () => {
+    expect(tsPct(makeStat({ fga: 0, fta: 0 }))).toBe(0);
+  });
+});
+
 function makeStat(overrides: Partial<ShootingStat>): ShootingStat {
   return {
     id: "1",
@@ -113,6 +137,10 @@ function makeStat(overrides: Partial<ShootingStat>): ShootingStat {
     fg3a: 300,
     fg3m: 120,
     fg3Pct: 40,
+    fta: 200,
+    ftm: 160,
+    ftPct: 80,
+    points: 1280,
     pointsPerGame: 12,
     fgaPerGame: 14,
     ...overrides,
