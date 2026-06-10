@@ -13,13 +13,13 @@ describe("ShotChart", () => {
   });
 
   it("draws hexbins for a cluster of shots", () => {
-    const shots: Shot[] = Array.from({ length: 25 }, () => ({ x: 0, y: 6, made: true }));
+    const shots: Shot[] = Array.from({ length: 25 }, () => ({ x: 0, y: 6, made: true, value: 2 }));
     const html = renderToStaticMarkup(<ShotChart shots={shots} />);
     expect(html).toContain('fill="rgb');
   });
 
   it("drops shots beyond half court", () => {
-    const heaves: Shot[] = [{ x: 0, y: 80, made: true }];
+    const heaves: Shot[] = [{ x: 0, y: 80, made: true, value: 3 }];
     const html = renderToStaticMarkup(<ShotChart shots={heaves} />);
     expect(html).not.toContain('fill="rgb');
   });

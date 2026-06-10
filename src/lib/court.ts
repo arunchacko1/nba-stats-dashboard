@@ -37,6 +37,15 @@ export function toSvg(point: Point): Point {
   };
 }
 
+// Inverse of toSvg: recover court feet from an SVG coordinate. Used to look up a
+// hexbin's location in the league-average grid.
+export function fromSvg(point: Point): Point {
+  return {
+    x: point.x / SCALE - COURT.width / 2,
+    y: point.y / SCALE,
+  };
+}
+
 // Shots past half court are almost always desperation heaves; keeping them would
 // stretch the chart and skew the density bins.
 export function isWithinHalfCourt(point: Point): boolean {

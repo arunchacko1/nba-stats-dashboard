@@ -1,3 +1,4 @@
+import type { ColorMode } from "@/components/ShotChart";
 import type { ShotSummary } from "@/lib/usePlayerShots";
 
 // Presentational pieces shared by the shot-chart explorer and the player detail
@@ -22,15 +23,16 @@ function Stat({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-export function ShotChartLegend() {
+export function ShotChartLegend({ colorMode = "rate" }: { colorMode?: ColorMode }) {
+  const league = colorMode === "league";
   return (
     <div className="space-y-2 text-xs text-zinc-400">
       <div>
-        <span className="mb-1 block">Make rate</span>
+        <span className="mb-1 block">{league ? "FG% vs league" : "Make rate"}</span>
         <div className="h-2 w-full rounded bg-gradient-to-r from-[#2166ac] via-[#f7f7f7] to-[#b2182b]" />
         <div className="mt-1 flex justify-between">
-          <span>cold</span>
-          <span>hot</span>
+          <span>{league ? "below" : "cold"}</span>
+          <span>{league ? "above" : "hot"}</span>
         </div>
       </div>
       <p>Hexagon size shows how often a spot is shot from.</p>

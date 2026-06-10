@@ -43,6 +43,11 @@ const MIN_ATTEMPTS = 200;
 const COORD_SENTINEL = -2147483648;
 const RIM_Y_OFFSET = 5.25;
 
+// League-average baseline grid: court feet bucketed into square cells. A cell
+// needs a minimum sample before its make rate is trustworthy.
+const CELL_FT = 2;
+const MIN_CELL_ATTEMPTS = 25;
+
 // Featured players for the shot chart. Matched accent- and case-insensitively
 // so "Luka Doncic" lines up with ESPN's "Luka Dončić".
 const FEATURED = [
@@ -178,12 +183,30 @@ async function collectGameIds(featured) {
   return [...ids];
 }
 
+function cellKey(point) {
+  return `${Math.round(point.x / CELL_FT)},${Math.round(point.y / CELL_FT)}`;
+}
+
+// Turn the accumulated league make/attempt tallies into a compact grid of make
+// rates, one tuple [gx, gy, fgPct] per cell that cleared the sample floor.
+function buildBaselineZones(league) {
+  const zones = [];
+  for (const [key, tally] of league) {
+    if (tally.attempts < MIN_CELL_ATTEMPTS) continue;
+    const [gx, gy] = key.split(",").map(Number);
+    zones.push([gx, gy, round((tally.made / tally.attempts) * 100)]);
+  }
+  return zones;
+}
+
 async function buildShotMaps(featured) {
   const featuredIds = new Set(featured.map((player) => player.id));
   const shotsById = new Map(featured.map((player) => [player.id, []]));
+  // Every field-goal attempt in these games (all players) feeds the league grid.
+  const league = new Map();
 
   const gameIds = await collectGameIds(featured);
-  console.log(`Scanning ${gameIds.length} games for featured-player shots...`);
+  console.log(`Scanning ${gameIds.length} games for shots...`);
 
   let scanned = 0;
   for (const gameId of gameIds) {
@@ -199,18 +222,28 @@ async function buildShotMaps(featured) {
 
     for (const play of summary.plays ?? []) {
       if (!play.shootingPlay) continue;
-      const shooterId = play.participants?.[0]?.athlete?.id;
-      if (!shooterId || !featuredIds.has(String(shooterId))) continue;
       const point = toCourt(play.coordinate);
       if (!point) continue;
-      shotsById.get(String(shooterId)).push({ ...point, made: play.scoringPlay === true });
+      const made = play.scoringPlay === true;
+
+      const key = cellKey(point);
+      const tally = league.get(key) ?? { attempts: 0, made: 0 };
+      tally.attempts += 1;
+      if (made) tally.made += 1;
+      league.set(key, tally);
+
+      const shooterId = play.participants?.[0]?.athlete?.id;
+      if (shooterId && featuredIds.has(String(shooterId))) {
+        const value = play.pointsAttempted === 3 ? 3 : 2;
+        shotsById.get(String(shooterId)).push({ ...point, made, value });
+      }
     }
 
     scanned += 1;
     if (scanned % 100 === 0) console.log(`  ...${scanned}/${gameIds.length}`);
   }
 
-  return featured
+  const players = featured
     .map((player) => ({ ...player, shots: shotsById.get(player.id) }))
     .filter((player) => {
       if (player.shots.length === 0) {
@@ -219,6 +252,8 @@ async function buildShotMaps(featured) {
       }
       return true;
     });
+
+  return { players, baseline: { cell: CELL_FT, zones: buildBaselineZones(league) } };
 }
 
 // A density sanity check on the coordinate transform: the busiest cell should sit
@@ -258,7 +293,7 @@ async function main() {
   console.log(`Wrote shooting stats for ${players.length} players`);
 
   const featured = resolveFeatured(byathlete, teamNames);
-  const withShots = await buildShotMaps(featured);
+  const { players: withShots, baseline } = await buildShotMaps(featured);
   checkCalibration(withShots);
 
   const index = withShots.map(({ id, name, team, shots }) => ({
@@ -271,7 +306,10 @@ async function main() {
   for (const player of withShots) {
     await writeJson(`public/shots/${player.id}.json`, player.shots);
   }
-  console.log(`Wrote shot maps for ${withShots.length} featured players`);
+  await writeJson("public/shots/league-baseline.json", baseline);
+  console.log(
+    `Wrote shot maps for ${withShots.length} featured players and ${baseline.zones.length} league baseline cells`,
+  );
 }
 
 main().catch((error) => {

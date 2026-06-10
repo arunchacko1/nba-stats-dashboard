@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { ShotChart } from "@/components/ShotChart";
+import { ShotControls, defaultShotOptions, type ShotChartOptions } from "@/components/ShotControls";
 import { ShotChartLegend, ShotSummaryStats } from "@/components/shotChartUi";
 import { fetchShotPlayers, type ShotPlayerSummary } from "@/lib/shots";
+import { useLeagueBaseline } from "@/lib/useLeagueBaseline";
 import { usePlayerShots } from "@/lib/usePlayerShots";
 
 export function ShotExplorer() {
   const [players, setPlayers] = useState<ShotPlayerSummary[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [listFailed, setListFailed] = useState(false);
+  const [options, setOptions] = useState<ShotChartOptions>(defaultShotOptions);
+  const baseline = useLeagueBaseline();
 
   useEffect(() => {
     let active = true;
@@ -51,14 +55,26 @@ export function ShotExplorer() {
 
         {summary && <ShotSummaryStats summary={summary} />}
 
-        <ShotChartLegend />
+        <ShotControls
+          options={options}
+          onChange={setOptions}
+          leagueAvailable={baseline !== null}
+        />
+
+        <ShotChartLegend colorMode={options.colorMode} />
       </div>
 
       <div className="flex-1">
         {isLoading ? (
           <p className="text-sm text-zinc-400">Loading shots…</p>
         ) : (
-          <ShotChart shots={shots} />
+          <ShotChart
+            shots={shots}
+            result={options.result}
+            shotType={options.shotType}
+            colorMode={options.colorMode}
+            baseline={baseline}
+          />
         )}
       </div>
     </div>

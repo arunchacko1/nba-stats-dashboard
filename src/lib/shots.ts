@@ -6,8 +6,24 @@ export const shotSchema = z.object({
   x: z.number(),
   y: z.number(),
   made: z.boolean(),
+  value: z.union([z.literal(2), z.literal(3)]),
 });
 export type Shot = z.infer<typeof shotSchema>;
+
+// League-average make rate by court cell, used to color a player's chart by how
+// his hot/cold spots compare to the league. Cells are [gridX, gridY, fgPct]
+// where the grid step is `cell` feet (see scripts/build-shot-data.mjs).
+export const leagueBaselineSchema = z.object({
+  cell: z.number(),
+  zones: z.array(z.tuple([z.number(), z.number(), z.number()])),
+});
+export type LeagueBaseline = z.infer<typeof leagueBaselineSchema>;
+
+export async function fetchLeagueBaseline(): Promise<LeagueBaseline> {
+  const response = await fetch("/shots/league-baseline.json");
+  if (!response.ok) throw new Error(`Failed to load league baseline: ${response.status}`);
+  return leagueBaselineSchema.parse(await response.json());
+}
 
 export const shotPlayerSummarySchema = z.object({
   id: z.string(),
