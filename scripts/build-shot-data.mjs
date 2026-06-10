@@ -278,6 +278,68 @@ function checkCalibration(featured) {
   }
 }
 
+// ESPN reports made/attempted as a single "m-a" string (e.g. "3-10").
+function splitPair(text) {
+  const [made, attempted] = String(text ?? "0-0").split("-").map(Number);
+  return [made || 0, attempted || 0];
+}
+
+// Per-player game logs for the trend chart and table on the player page. One
+// gamelog call per player; regular-season games only (matches the table).
+async function buildGameLogs(players) {
+  // Regular-season window, so the log matches the (regular-season) table and
+  // excludes preseason and playoff games.
+  const regularSeasonStart = "2025-10-21";
+  const regularSeasonEnd = "2026-04-14";
+  let written = 0;
+
+  for (const player of players) {
+    let log;
+    try {
+      log = await fetchJson(gamelogUrl(player.id));
+    } catch (error) {
+      console.warn(`  no game log for ${player.name}: ${error.message}`);
+      continue;
+    }
+
+    const names = log.names ?? [];
+    const at = (statName) => names.indexOf(statName);
+    const statsByEvent = new Map();
+    for (const seasonType of log.seasonTypes ?? [])
+      for (const category of seasonType.categories ?? [])
+        for (const event of category.events ?? []) statsByEvent.set(event.eventId, event.stats);
+
+    const games = [];
+    for (const [eventId, meta] of Object.entries(log.events ?? {})) {
+      const stats = statsByEvent.get(eventId);
+      if (!stats) continue;
+      const date = meta.gameDate?.slice(0, 10) ?? "";
+      if (!date || date < regularSeasonStart || date >= regularSeasonEnd) continue;
+      const [fgm, fga] = splitPair(stats[at("fieldGoalsMade-fieldGoalsAttempted")]);
+      const [fg3m, fg3a] = splitPair(stats[at("threePointFieldGoalsMade-threePointFieldGoalsAttempted")]);
+      games.push({
+        date,
+        opponent: meta.opponent?.abbreviation ?? "",
+        home: meta.atVs === "vs",
+        won: meta.gameResult === "W",
+        points: Number(stats[at("points")]) || 0,
+        fgm,
+        fga,
+        fg3m,
+        fg3a,
+      });
+    }
+
+    if (games.length === 0) continue;
+    games.sort((a, b) => a.date.localeCompare(b.date));
+    await writeJson(`public/gamelogs/${player.id}.json`, games);
+    written += 1;
+    if (written % 100 === 0) console.log(`  ...${written} game logs`);
+  }
+
+  return written;
+}
+
 async function writeJson(relativePath, data) {
   const target = join(projectRoot, relativePath);
   await mkdir(dirname(target), { recursive: true });
@@ -310,6 +372,10 @@ async function main() {
   console.log(
     `Wrote shot maps for ${withShots.length} featured players and ${baseline.zones.length} league baseline cells`,
   );
+
+  console.log(`Fetching game logs for ${players.length} players...`);
+  const logs = await buildGameLogs(players);
+  console.log(`Wrote ${logs} game logs`);
 }
 
 main().catch((error) => {

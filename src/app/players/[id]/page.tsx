@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlayerShotChart } from "@/components/PlayerShotChart";
+import { PlayerTrends } from "@/components/PlayerTrends";
 import { getPlayerById, getShootingStats } from "@/lib/shooting";
 import { hasShotMap } from "@/lib/shotIndex";
 
@@ -45,6 +46,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <Split label="FGM / FGA" value={`${player.fgm} / ${player.fga}`} />
           <Split label="3PM / 3PA" value={`${player.fg3m} / ${player.fg3a}`} />
         </dl>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-xl font-semibold tracking-tight">Game Log</h2>
+        <PlayerTrends playerId={id} />
       </section>
 
       <section>
