@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ShotChart } from "./ShotChart";
+import { ShotChart, describeHex } from "./ShotChart";
 import type { Shot } from "@/lib/shots";
 
 // Hexbins are filled with a color-scale rgb() string while the court lines use
@@ -22,5 +22,16 @@ describe("ShotChart", () => {
     const heaves: Shot[] = [{ x: 0, y: 80, made: true }];
     const html = renderToStaticMarkup(<ShotChart shots={heaves} />);
     expect(html).not.toContain('fill="rgb');
+  });
+});
+
+describe("describeHex", () => {
+  it("reports the rounded make percentage with makes and attempts", () => {
+    expect(describeHex({ made: 3, count: 6 })).toEqual({ pct: 50, made: 3, attempts: 6 });
+  });
+
+  it("rounds to the nearest whole percent", () => {
+    expect(describeHex({ made: 1, count: 3 }).pct).toBe(33);
+    expect(describeHex({ made: 2, count: 3 }).pct).toBe(67);
   });
 });

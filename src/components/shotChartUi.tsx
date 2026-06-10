@@ -34,6 +34,7 @@ export function ShotChartLegend() {
         </div>
       </div>
       <p>Hexagon size shows how often a spot is shot from.</p>
+      <p>Hover a hexagon for its FG% and attempts.</p>
     </div>
   );
 }
