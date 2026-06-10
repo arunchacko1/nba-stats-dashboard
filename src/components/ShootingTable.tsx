@@ -10,7 +10,7 @@ import {
   useReactTable,
   type SortingState,
 } from "@tanstack/react-table";
-import { filterPlayers, type ShootingStat } from "@/lib/shooting";
+import { filterPlayers, teamOptions, type ShootingStat } from "@/lib/shooting";
 
 const columnHelper = createColumnHelper<ShootingStat>();
 
@@ -29,7 +29,7 @@ const columns = [
   }),
   columnHelper.accessor("team", { header: "Team", enableSorting: true }),
   columnHelper.accessor("games", { header: "GP" }),
-  columnHelper.accessor("pointsPerGame", { header: "FG Pts/G" }),
+  columnHelper.accessor("pointsPerGame", { header: "PPG" }),
   columnHelper.accessor("fgaPerGame", { header: "FGA/G" }),
   columnHelper.accessor("fgPct", { header: "FG%", cell: (c) => c.getValue().toFixed(1) }),
   columnHelper.accessor("fg3m", { header: "3PM" }),
@@ -49,9 +49,11 @@ const numericColumns = new Set([
 
 export function ShootingTable({ players }: { players: ShootingStat[] }) {
   const [query, setQuery] = useState("");
+  const [team, setTeam] = useState("");
   const [sorting, setSorting] = useState<SortingState>([{ id: "pointsPerGame", desc: true }]);
 
-  const data = useMemo(() => filterPlayers(players, query), [players, query]);
+  const teams = useMemo(() => teamOptions(players), [players]);
+  const data = useMemo(() => filterPlayers(players, { query, team }), [players, query, team]);
 
   // TanStack's useReactTable manages its own memoization, which the React Compiler
   // lint rule doesn't recognize. This is the documented way to opt it out.
@@ -67,13 +69,28 @@ export function ShootingTable({ players }: { players: ShootingStat[] }) {
 
   return (
     <div>
-      <input
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Filter by player or team"
-        className="mb-4 w-full max-w-xs rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
-      />
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Filter by player or team"
+          className="w-full max-w-xs rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+        />
+        <select
+          value={team}
+          onChange={(event) => setTeam(event.target.value)}
+          aria-label="Filter by team"
+          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+        >
+          <option value="">All teams</option>
+          {teams.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="overflow-x-auto rounded-lg border border-zinc-800">
         <table className="w-full text-sm">
           <thead className="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-400">
@@ -118,7 +135,7 @@ export function ShootingTable({ players }: { players: ShootingStat[] }) {
         </table>
       </div>
       {data.length === 0 && (
-        <p className="mt-4 text-sm text-zinc-500">No players match &ldquo;{query}&rdquo;.</p>
+        <p className="mt-4 text-sm text-zinc-500">No players match your filters.</p>
       )}
     </div>
   );

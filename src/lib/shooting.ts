@@ -1,9 +1,9 @@
 import { z } from "zod";
 import raw from "@/data/shooting-stats.json";
 
-// Aggregated per-player field-goal data produced by scripts/build-shot-data.mjs.
-// Points here are field-goal points only — the source shot log has no free
-// throws — so the UI labels this as FG points rather than true PPG.
+// Aggregated per-player shooting data produced by scripts/build-shot-data.mjs
+// from ESPN season totals. pointsPerGame is true points per game (free throws
+// included); fga/fgm and the three-point splits are field goals.
 export const shootingStatSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -37,12 +37,33 @@ export function getPlayerById(id: string): ShootingStat | null {
   return getShootingStats().players.find((player) => player.id === id) ?? null;
 }
 
-export function filterPlayers(players: ShootingStat[], query: string): ShootingStat[] {
-  const normalized = query.trim().toLowerCase();
-  if (normalized.length === 0) return players;
-  return players.filter(
-    (player) =>
-      player.name.toLowerCase().includes(normalized) ||
-      player.team.toLowerCase().includes(normalized),
+// Distinct team names for the table's team dropdown, sorted alphabetically.
+export function teamOptions(players: ShootingStat[]): string[] {
+  return Array.from(new Set(players.map((player) => player.team))).sort((a, b) =>
+    a.localeCompare(b),
   );
+}
+
+export interface ShootingFilters {
+  query?: string;
+  team?: string;
+}
+
+// Single entry point for the table's filters. An empty or absent value means "no
+// constraint", so filterPlayers(players, {}) returns the full default list. Filters
+// combine with AND; shaped to take more dropdowns later without touching callers.
+export function filterPlayers(players: ShootingStat[], filters: ShootingFilters): ShootingStat[] {
+  const query = filters.query?.trim().toLowerCase() ?? "";
+  const team = filters.team ?? "";
+  return players.filter((player) => {
+    if (team && player.team !== team) return false;
+    if (
+      query &&
+      !player.name.toLowerCase().includes(query) &&
+      !player.team.toLowerCase().includes(query)
+    ) {
+      return false;
+    }
+    return true;
+  });
 }

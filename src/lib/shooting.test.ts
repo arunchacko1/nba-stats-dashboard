@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { filterPlayers, getPlayerById, getShootingStats, type ShootingStat } from "./shooting";
+import {
+  filterPlayers,
+  getPlayerById,
+  getShootingStats,
+  teamOptions,
+  type ShootingStat,
+} from "./shooting";
 
 // These run against the committed ETL output, so they double as a guard that the
 // generated dataset stays internally consistent if the build script changes.
 describe("shooting dataset", () => {
   const { season, players } = getShootingStats();
 
-  it("loads the 2024-25 season and validates against the schema", () => {
-    expect(season).toBe("2024-25");
+  it("loads the 2025-26 season and validates against the schema", () => {
+    expect(season).toBe("2025-26");
     expect(players.length).toBeGreaterThan(100);
   });
 
@@ -28,11 +34,13 @@ describe("shooting dataset", () => {
     }
   });
 
-  it("derives per-game field-goal points consistently with makes", () => {
+  it("reports true points per game at or above field-goal-only scoring", () => {
     for (const player of players) {
-      const points = (player.fgm - player.fg3m) * 2 + player.fg3m * 3;
-      const expected = Math.round((points / player.games) * 10) / 10;
-      expect(player.pointsPerGame).toBeCloseTo(expected, 5);
+      // pointsPerGame includes free throws, so it can only meet or exceed the
+      // points implied by field goals alone — and should stay in a sane range.
+      const fgPointsPerGame = ((player.fgm - player.fg3m) * 2 + player.fg3m * 3) / player.games;
+      expect(player.pointsPerGame).toBeGreaterThanOrEqual(Math.floor(fgPointsPerGame * 10) / 10);
+      expect(player.pointsPerGame).toBeLessThan(50);
     }
   });
 });
@@ -50,30 +58,46 @@ describe("getPlayerById", () => {
   });
 });
 
-describe("filterPlayers", () => {
-  const sample: ShootingStat[] = [
-    makeStat({ name: "Stephen Curry", team: "Golden State Warriors" }),
-    makeStat({ name: "Klay Thompson", team: "Dallas Mavericks" }),
-    makeStat({ name: "Luka Dončić", team: "Dallas Mavericks" }),
-  ];
+const sample: ShootingStat[] = [
+  makeStat({ id: "1", name: "Stephen Curry", team: "Golden State Warriors" }),
+  makeStat({ id: "2", name: "Klay Thompson", team: "Dallas Mavericks" }),
+  makeStat({ id: "3", name: "Luka Dončić", team: "Dallas Mavericks" }),
+];
 
-  it("returns everyone when the query is blank or whitespace", () => {
-    expect(filterPlayers(sample, "")).toHaveLength(3);
-    expect(filterPlayers(sample, "   ")).toHaveLength(3);
+describe("teamOptions", () => {
+  it("returns distinct team names sorted alphabetically", () => {
+    expect(teamOptions(sample)).toEqual(["Dallas Mavericks", "Golden State Warriors"]);
+  });
+});
+
+describe("filterPlayers", () => {
+  it("returns everyone when no filters are set", () => {
+    expect(filterPlayers(sample, {})).toHaveLength(3);
+    expect(filterPlayers(sample, { query: "   " })).toHaveLength(3);
   });
 
   it("matches on player name, case-insensitively", () => {
-    const result = filterPlayers(sample, "curry");
+    const result = filterPlayers(sample, { query: "curry" });
     expect(result.map((p) => p.name)).toEqual(["Stephen Curry"]);
   });
 
   it("matches on team name", () => {
-    const result = filterPlayers(sample, "dallas");
-    expect(result).toHaveLength(2);
+    expect(filterPlayers(sample, { query: "dallas" })).toHaveLength(2);
   });
 
-  it("returns nothing when nothing matches", () => {
-    expect(filterPlayers(sample, "celtics")).toHaveLength(0);
+  it("filters by the team dropdown alone", () => {
+    const result = filterPlayers(sample, { team: "Dallas Mavericks" });
+    expect(result.map((p) => p.id)).toEqual(["2", "3"]);
+  });
+
+  it("applies team and query together with AND", () => {
+    const result = filterPlayers(sample, { team: "Dallas Mavericks", query: "luka" });
+    expect(result.map((p) => p.name)).toEqual(["Luka Dončić"]);
+  });
+
+  it("returns nothing when the combination matches nothing", () => {
+    expect(filterPlayers(sample, { team: "Golden State Warriors", query: "luka" })).toHaveLength(0);
+    expect(filterPlayers(sample, { query: "celtics" })).toHaveLength(0);
   });
 });
 

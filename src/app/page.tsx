@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Game } from "@/lib/api/schemas";
 import { getSeasonData } from "@/lib/seasonData";
 import { getShootingStats } from "@/lib/shooting";
-import { SEASON_LABEL, SHOOTING_SEASON_LABEL } from "@/lib/season";
+import { SEASON_LABEL } from "@/lib/season";
 import { deriveStandings, type TeamRecord } from "@/lib/standings";
 
 // Re-pull the live standings/scores hourly; the snapshot fallback keeps the page
@@ -28,8 +28,8 @@ export default async function HomePage() {
       <section>
         <h1 className="text-3xl font-bold tracking-tight">{SEASON_LABEL} NBA Shooting Dashboard</h1>
         <p className="mt-2 max-w-2xl text-zinc-400">
-          Live {SEASON_LABEL} standings and scores from balldontlie, alongside {SHOOTING_SEASON_LABEL}{" "}
-          shooting splits and D3 shot charts built from a full season of shot-location data.
+          Live {SEASON_LABEL} standings and scores from balldontlie, with full-season shooting
+          splits and D3 shot charts built from shot-location data.
         </p>
         <p className="mt-1 text-xs text-zinc-500">
           {live
@@ -49,7 +49,7 @@ export default async function HomePage() {
 
       <section>
         <div className="flex items-baseline justify-between">
-          <SectionHeading>Field-Goal Scoring Leaders</SectionHeading>
+          <SectionHeading>Scoring Leaders</SectionHeading>
           <Link href="/players" className="text-sm text-zinc-400 hover:text-white">
             All shooting stats →
           </Link>
@@ -66,9 +66,7 @@ export default async function HomePage() {
             </li>
           ))}
         </ol>
-        <p className="mt-2 text-xs text-zinc-500">
-          {SHOOTING_SEASON_LABEL} field-goal points per game (excludes free throws).
-        </p>
+        <p className="mt-2 text-xs text-zinc-500">{SEASON_LABEL} points per game.</p>
       </section>
     </div>
   );

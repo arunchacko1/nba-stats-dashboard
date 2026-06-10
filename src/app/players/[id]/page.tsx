@@ -37,11 +37,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       <section>
         <h2 className="mb-3 text-xl font-semibold tracking-tight">Shooting Splits</h2>
-        <p className="mb-3 text-xs text-zinc-500">
-          Field-goal points only — free throws are not in the source data.
-        </p>
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <Split label="FG Pts/G" value={player.pointsPerGame.toFixed(1)} />
+          <Split label="PPG" value={player.pointsPerGame.toFixed(1)} />
           <Split label="FGA/G" value={player.fgaPerGame.toFixed(1)} />
           <Split label="FG%" value={`${player.fgPct.toFixed(1)}%`} />
           <Split label="3P%" value={`${player.fg3Pct.toFixed(1)}%`} />

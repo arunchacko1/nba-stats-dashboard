@@ -1,31 +1,50 @@
 // Build-time ETL for the shooting dashboard.
 //
 // stats.nba.com silently drops requests from most networks, so instead of
-// scraping it at deploy time we pull a published season shot log (every field
-// goal attempt with court coordinates), aggregate it into the shooting table,
-// and carve out per-player shot maps for the chart. Everything it writes is
-// committed, so the deployed app never depends on an external data host.
+// scraping it at deploy time we pull the numbers from ESPN's web API at build
+// time and commit the result. Everything this writes is committed, so the
+// deployed app never depends on an external data host at request time.
 //
-// Source: https://github.com/DomSamangy/NBA_Shots_04_25
+// Two outputs:
+//   - src/data/shooting-stats.json: per-player season aggregates for the table.
+//   - public/shots/*.json:          per-shot coordinates for the featured charts.
+//
+// Players are keyed by their ESPN athlete id throughout, so the table, the shot
+// index, and the shot files all line up.
 //
 //   npm run build:data
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { unzipSync, strFromU8 } from "fflate";
-import { parse } from "csv-parse/sync";
 
-const SEASON_LABEL = "2024-25";
-const SOURCE_URL =
-  "https://raw.githubusercontent.com/DomSamangy/NBA_Shots_04_25/main/NBA_2025_Shots.csv.zip";
+const SEASON = 2026; // ESPN's year for the 2025-26 season.
+const SEASON_LABEL = "2025-26";
+const SEASON_TYPE = 2; // Regular season.
+
+const BYATHLETE_URL =
+  `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete` +
+  `?region=us&lang=en&contentorigin=espn&isqualified=false&page=1&limit=700` +
+  `&season=${SEASON}&seasontype=${SEASON_TYPE}`;
+const TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams";
+const gamelogUrl = (id) =>
+  `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${id}/gamelog?season=${SEASON}`;
+const summaryUrl = (id) =>
+  `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
 
 // A player needs a real sample of attempts before per-game shooting splits mean
 // anything; this drops deep bench players who took a handful of shots all year.
 const MIN_ATTEMPTS = 200;
 
+// ESPN court coordinates are in feet with the rim at (25, 0) and both teams
+// normalized onto one half; this shifts them into the convention court.ts uses
+// (rim at (0, 5.25), x running -25..25). Missing coordinates come back as this
+// int sentinel — drop those and anything off the court.
+const COORD_SENTINEL = -2147483648;
+const RIM_Y_OFFSET = 5.25;
+
 // Featured players for the shot chart. Matched accent- and case-insensitively
-// so "Luka Doncic" lines up with the dataset's "Luka Dončić".
+// so "Luka Doncic" lines up with ESPN's "Luka Dončić".
 const FEATURED = [
   "LeBron James",
   "Stephen Curry",
@@ -52,99 +71,171 @@ function round(value, places = 1) {
   return Math.round(value * factor) / factor;
 }
 
-async function loadShots() {
-  const response = await fetch(SOURCE_URL);
-  if (!response.ok) {
-    throw new Error(`Failed to download shot data: HTTP ${response.status}`);
-  }
-  const archive = unzipSync(new Uint8Array(await response.arrayBuffer()));
-  const csvName = Object.keys(archive).find((name) => name.endsWith(".csv"));
-  if (!csvName) throw new Error("No CSV found inside the downloaded archive");
-  return parse(strFromU8(archive[csvName]), { columns: true, skip_empty_lines: true });
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function aggregatePlayers(rows) {
-  const byPlayer = new Map();
-
-  for (const row of rows) {
-    const id = row.PLAYER_ID;
-    let player = byPlayer.get(id);
-    if (!player) {
-      player = {
-        id,
-        name: row.PLAYER_NAME,
-        teamShots: new Map(),
-        games: new Set(),
-        fga: 0,
-        fgm: 0,
-        fg3a: 0,
-        fg3m: 0,
-      };
-      byPlayer.set(id, player);
+async function fetchJson(url, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      await sleep(500 * attempt);
     }
-
-    const made = row.SHOT_MADE === "TRUE";
-    const isThree = row.SHOT_TYPE === "3PT Field Goal";
-    player.games.add(row.GAME_ID);
-    player.fga += 1;
-    if (made) player.fgm += 1;
-    if (isThree) {
-      player.fg3a += 1;
-      if (made) player.fg3m += 1;
-    }
-    player.teamShots.set(row.TEAM_NAME, (player.teamShots.get(row.TEAM_NAME) ?? 0) + 1);
   }
+}
 
-  return [...byPlayer.values()]
-    .filter((player) => player.fga >= MIN_ATTEMPTS)
-    .map((player) => {
-      const games = player.games.size;
-      const points = (player.fgm - player.fg3m) * 2 + player.fg3m * 3;
-      // Team a player shot most for, which handles mid-season trades sensibly.
-      const team = [...player.teamShots.entries()].sort((a, b) => b[1] - a[1])[0][0];
+// Each athlete entry is { athlete: {bio}, categories: [stats] }. ESPN groups the
+// stat values into named categories whose value arrays line up with the label
+// arrays on the response's top-level `categories`. This builds a reader that
+// resolves a stat by (category, label) so we never hard-code array offsets.
+function makeStatReader(topCategories) {
+  const labels = new Map(topCategories.map((category) => [category.name, category.names]));
+  return (entry, categoryName, statName) => {
+    const category = entry.categories.find((c) => c.name === categoryName);
+    const index = labels.get(categoryName)?.indexOf(statName) ?? -1;
+    if (!category || index < 0) return 0;
+    return category.values[index] ?? 0;
+  };
+}
+
+async function buildTeamNames() {
+  const data = await fetchJson(TEAMS_URL);
+  const teams = data.sports[0].leagues[0].teams;
+  return new Map(teams.map(({ team }) => [String(team.id), team.displayName]));
+}
+
+function aggregatePlayers(byathlete, teamNames) {
+  const stat = makeStatReader(byathlete.categories);
+
+  return byathlete.athletes
+    .filter((entry) => stat(entry, "offensive", "fieldGoalsAttempted") >= MIN_ATTEMPTS)
+    .map((entry) => {
+      const { athlete } = entry;
       return {
-        id: player.id,
-        name: player.name,
-        team,
-        games,
-        fga: player.fga,
-        fgm: player.fgm,
-        fgPct: round((player.fgm / player.fga) * 100),
-        fg3a: player.fg3a,
-        fg3m: player.fg3m,
-        fg3Pct: player.fg3a > 0 ? round((player.fg3m / player.fg3a) * 100) : 0,
-        pointsPerGame: round(points / games),
-        fgaPerGame: round(player.fga / games),
+        id: String(athlete.id),
+        name: athlete.displayName,
+        team: teamNames.get(String(athlete.teamId)) ?? athlete.teamName ?? "—",
+        games: stat(entry, "general", "gamesPlayed"),
+        fga: stat(entry, "offensive", "fieldGoalsAttempted"),
+        fgm: stat(entry, "offensive", "fieldGoalsMade"),
+        fgPct: round(stat(entry, "offensive", "fieldGoalPct")),
+        fg3a: stat(entry, "offensive", "threePointFieldGoalsAttempted"),
+        fg3m: stat(entry, "offensive", "threePointFieldGoalsMade"),
+        fg3Pct: round(stat(entry, "offensive", "threePointFieldGoalPct")),
+        // ESPN's avgPoints is true points per game (includes free throws), unlike
+        // the old shot-log source that only knew about field goals.
+        pointsPerGame: round(stat(entry, "offensive", "avgPoints")),
+        fgaPerGame: round(stat(entry, "offensive", "avgFieldGoalsAttempted")),
       };
     })
     .sort((a, b) => b.pointsPerGame - a.pointsPerGame);
 }
 
-function extractFeaturedShots(rows) {
+function resolveFeatured(byathlete, teamNames) {
   const wanted = new Map(FEATURED.map((name) => [normalizeName(name), name]));
   const found = new Map();
-
-  for (const row of rows) {
-    const key = normalizeName(row.PLAYER_NAME);
-    if (!wanted.has(key)) continue;
-
-    let entry = found.get(key);
-    if (!entry) {
-      entry = { id: row.PLAYER_ID, name: row.PLAYER_NAME, team: row.TEAM_NAME, shots: [] };
-      found.set(key, entry);
-    }
-    entry.shots.push({
-      x: round(Number(row.LOC_X)),
-      y: round(Number(row.LOC_Y)),
-      made: row.SHOT_MADE === "TRUE",
+  for (const { athlete } of byathlete.athletes) {
+    const key = normalizeName(athlete.displayName);
+    if (!wanted.has(key) || found.has(key)) continue;
+    found.set(key, {
+      id: String(athlete.id),
+      name: athlete.displayName,
+      team: teamNames.get(String(athlete.teamId)) ?? athlete.teamName ?? "—",
     });
   }
-
   const missing = [...wanted.keys()].filter((key) => !found.has(key));
   if (missing.length > 0) {
     console.warn(`Featured players not found: ${missing.map((k) => wanted.get(k)).join(", ")}`);
   }
-  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...found.values()];
+}
+
+function toCourt(coordinate) {
+  if (!coordinate) return null;
+  const { x, y } = coordinate;
+  if (x === COORD_SENTINEL || y === COORD_SENTINEL) return null;
+  if (x < 0 || x > 50 || y < 0 || y > 60) return null;
+  return { x: round(x - 25), y: round(y + RIM_Y_OFFSET) };
+}
+
+// Collect every regular-season game any featured player appeared in, so each
+// game's play-by-play is fetched at most once.
+async function collectGameIds(featured) {
+  const ids = new Set();
+  for (const player of featured) {
+    const log = await fetchJson(gamelogUrl(player.id));
+    for (const gameId of Object.keys(log.events ?? {})) ids.add(gameId);
+  }
+  return [...ids];
+}
+
+async function buildShotMaps(featured) {
+  const featuredIds = new Set(featured.map((player) => player.id));
+  const shotsById = new Map(featured.map((player) => [player.id, []]));
+
+  const gameIds = await collectGameIds(featured);
+  console.log(`Scanning ${gameIds.length} games for featured-player shots...`);
+
+  let scanned = 0;
+  for (const gameId of gameIds) {
+    let summary;
+    try {
+      summary = await fetchJson(summaryUrl(gameId));
+    } catch (error) {
+      console.warn(`  skipped game ${gameId}: ${error.message}`);
+      continue;
+    }
+    // Keep the charts consistent with the regular-season-only table.
+    if (summary.header?.season?.type && summary.header.season.type !== SEASON_TYPE) continue;
+
+    for (const play of summary.plays ?? []) {
+      if (!play.shootingPlay) continue;
+      const shooterId = play.participants?.[0]?.athlete?.id;
+      if (!shooterId || !featuredIds.has(String(shooterId))) continue;
+      const point = toCourt(play.coordinate);
+      if (!point) continue;
+      shotsById.get(String(shooterId)).push({ ...point, made: play.scoringPlay === true });
+    }
+
+    scanned += 1;
+    if (scanned % 100 === 0) console.log(`  ...${scanned}/${gameIds.length}`);
+  }
+
+  return featured
+    .map((player) => ({ ...player, shots: shotsById.get(player.id) }))
+    .filter((player) => {
+      if (player.shots.length === 0) {
+        console.warn(`No shots found for featured player ${player.name}; skipping.`);
+        return false;
+      }
+      return true;
+    });
+}
+
+// A density sanity check on the coordinate transform: the busiest cell should sit
+// near the rim. If it doesn't, the ESPN→court mapping has drifted.
+function checkCalibration(featured) {
+  const cells = new Map();
+  for (const player of featured) {
+    for (const shot of player.shots) {
+      const key = `${Math.round(shot.x / 2)},${Math.round(shot.y / 2)}`;
+      cells.set(key, (cells.get(key) ?? 0) + 1);
+    }
+  }
+  const [busiest] = [...cells.entries()].sort((a, b) => b[1] - a[1]);
+  if (!busiest) return;
+  const [cx, cy] = busiest[0].split(",").map(Number);
+  const x = cx * 2;
+  const y = cy * 2;
+  const distFromRim = Math.hypot(x - 0, y - RIM_Y_OFFSET);
+  console.log(`Calibration: busiest cell at (${x}, ${y}), ${round(distFromRim)} ft from rim`);
+  if (distFromRim > 8) {
+    console.warn("  Busiest cell is far from the rim — double-check the coordinate transform.");
+  }
 }
 
 async function writeJson(relativePath, data) {
@@ -154,26 +245,28 @@ async function writeJson(relativePath, data) {
 }
 
 async function main() {
-  console.log(`Downloading ${SEASON_LABEL} shot data...`);
-  const rows = await loadShots();
-  console.log(`Parsed ${rows.length.toLocaleString()} shots`);
+  console.log(`Fetching ${SEASON_LABEL} player stats from ESPN...`);
+  const [byathlete, teamNames] = await Promise.all([fetchJson(BYATHLETE_URL), buildTeamNames()]);
 
-  const players = aggregatePlayers(rows);
+  const players = aggregatePlayers(byathlete, teamNames);
   await writeJson("src/data/shooting-stats.json", { season: SEASON_LABEL, players });
   console.log(`Wrote shooting stats for ${players.length} players`);
 
-  const featured = extractFeaturedShots(rows);
-  const index = featured.map(({ id, name, team, shots }) => ({
+  const featured = resolveFeatured(byathlete, teamNames);
+  const withShots = await buildShotMaps(featured);
+  checkCalibration(withShots);
+
+  const index = withShots.map(({ id, name, team, shots }) => ({
     id,
     name,
     team,
     shotCount: shots.length,
   }));
   await writeJson("public/shots/index.json", { season: SEASON_LABEL, players: index });
-  for (const player of featured) {
+  for (const player of withShots) {
     await writeJson(`public/shots/${player.id}.json`, player.shots);
   }
-  console.log(`Wrote shot maps for ${featured.length} featured players`);
+  console.log(`Wrote shot maps for ${withShots.length} featured players`);
 }
 
 main().catch((error) => {

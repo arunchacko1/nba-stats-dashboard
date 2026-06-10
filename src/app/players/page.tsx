@@ -13,8 +13,7 @@ export default function PlayersPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Shooting Stats</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          {players.length} players with 200+ field-goal attempts in {season}. Field-goal points only
-          — free throws are not in the source data.
+          {players.length} players with 200+ field-goal attempts in {season}.
         </p>
       </header>
       <ShootingTable players={players} />
