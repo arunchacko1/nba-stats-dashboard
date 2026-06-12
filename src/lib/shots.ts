@@ -44,6 +44,23 @@ export async function fetchShotPlayers(): Promise<ShotPlayerSummary[]> {
   return indexSchema.parse(await response.json()).players;
 }
 
+// Distinct team names for the shot explorer's team dropdown, sorted alphabetically.
+export function shotTeamOptions(players: ShotPlayerSummary[]): string[] {
+  return Array.from(new Set(players.map((player) => player.team))).sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
+// Narrow the shot-player list to a single team. An empty team means "no
+// constraint", so the full list comes back unchanged.
+export function filterShotPlayersByTeam(
+  players: ShotPlayerSummary[],
+  team: string,
+): ShotPlayerSummary[] {
+  if (!team) return players;
+  return players.filter((player) => player.team === team);
+}
+
 export async function fetchPlayerShots(playerId: string): Promise<Shot[]> {
   const response = await fetch(`/shots/${playerId}.json`);
   if (!response.ok) throw new Error(`Failed to load shots for ${playerId}: ${response.status}`);

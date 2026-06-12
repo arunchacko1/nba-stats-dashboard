@@ -53,28 +53,7 @@ const RIM_Y_OFFSET = 5.25;
 const CELL_FT = 2;
 const MIN_CELL_ATTEMPTS = 25;
 
-// Featured players for the shot chart. Matched accent- and case-insensitively
-// so "Luka Doncic" lines up with ESPN's "Luka Dončić".
-const FEATURED = [
-  "LeBron James",
-  "Stephen Curry",
-  "Kevin Durant",
-  "Nikola Jokic",
-  "Giannis Antetokounmpo",
-  "Luka Doncic",
-  "Jayson Tatum",
-  "Shai Gilgeous-Alexander",
-  "Anthony Edwards",
-  "Devin Booker",
-  "Victor Wembanyama",
-  "Jalen Brunson",
-];
-
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-function normalizeName(name) {
-  return name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-}
 
 function round(value, places = 1) {
   const factor = 10 ** places;
@@ -152,25 +131,6 @@ function aggregatePlayers(byathlete, teamNames) {
     .sort((a, b) => b.pointsPerGame - a.pointsPerGame);
 }
 
-function resolveFeatured(byathlete, teamNames) {
-  const wanted = new Map(FEATURED.map((name) => [normalizeName(name), name]));
-  const found = new Map();
-  for (const { athlete } of byathlete.athletes) {
-    const key = normalizeName(athlete.displayName);
-    if (!wanted.has(key) || found.has(key)) continue;
-    found.set(key, {
-      id: String(athlete.id),
-      name: athlete.displayName,
-      team: teamNames.get(String(athlete.teamId)) ?? athlete.teamName ?? "—",
-    });
-  }
-  const missing = [...wanted.keys()].filter((key) => !found.has(key));
-  if (missing.length > 0) {
-    console.warn(`Featured players not found: ${missing.map((k) => wanted.get(k)).join(", ")}`);
-  }
-  return [...found.values()];
-}
-
 function toCourt(coordinate) {
   if (!coordinate) return null;
   const { x, y } = coordinate;
@@ -179,12 +139,29 @@ function toCourt(coordinate) {
   return { x: round(x - 25), y: round(y + RIM_Y_OFFSET) };
 }
 
-// Collect every regular-season game any featured player appeared in, so each
-// game's play-by-play is fetched at most once.
-async function collectGameIds(featured) {
+// Fetch every player's game log once, up front. The same logs drive two outputs
+// — the union of game ids to scan for shots, and the per-player trend files — so
+// fetching them here avoids hitting ESPN's gamelog endpoint twice per player.
+async function fetchGamelogs(players) {
+  const logs = new Map();
+  let fetched = 0;
+  for (const player of players) {
+    try {
+      logs.set(player.id, await fetchJson(gamelogUrl(player.id)));
+    } catch (error) {
+      console.warn(`  no game log for ${player.name}: ${error.message}`);
+    }
+    fetched += 1;
+    if (fetched % 100 === 0) console.log(`  ...${fetched}/${players.length} game logs`);
+  }
+  return logs;
+}
+
+// Union of every game id appearing in the collected logs, so each game's
+// play-by-play is fetched at most once regardless of how many players appeared.
+function collectGameIds(gamelogs) {
   const ids = new Set();
-  for (const player of featured) {
-    const log = await fetchJson(gamelogUrl(player.id));
+  for (const log of gamelogs.values()) {
     for (const gameId of Object.keys(log.events ?? {})) ids.add(gameId);
   }
   return [...ids];
@@ -206,13 +183,12 @@ function buildBaselineZones(league) {
   return zones;
 }
 
-async function buildShotMaps(featured) {
-  const featuredIds = new Set(featured.map((player) => player.id));
-  const shotsById = new Map(featured.map((player) => [player.id, []]));
+async function buildShotMaps(tablePlayers, gameIds) {
+  const tableIds = new Set(tablePlayers.map((player) => player.id));
+  const shotsById = new Map(tablePlayers.map((player) => [player.id, []]));
   // Every field-goal attempt in these games (all players) feeds the league grid.
   const league = new Map();
 
-  const gameIds = await collectGameIds(featured);
   console.log(`Scanning ${gameIds.length} games for shots...`);
 
   let scanned = 0;
@@ -240,7 +216,7 @@ async function buildShotMaps(featured) {
       league.set(key, tally);
 
       const shooterId = play.participants?.[0]?.athlete?.id;
-      if (shooterId && featuredIds.has(String(shooterId))) {
+      if (shooterId && tableIds.has(String(shooterId))) {
         const value = play.pointsAttempted === 3 ? 3 : 2;
         shotsById.get(String(shooterId)).push({ ...point, made, value });
       }
@@ -250,15 +226,17 @@ async function buildShotMaps(featured) {
     if (scanned % 100 === 0) console.log(`  ...${scanned}/${gameIds.length}`);
   }
 
-  const players = featured
-    .map((player) => ({ ...player, shots: shotsById.get(player.id) }))
-    .filter((player) => {
-      if (player.shots.length === 0) {
-        console.warn(`No shots found for featured player ${player.name}; skipping.`);
-        return false;
-      }
-      return true;
-    });
+  // Keep only players we actually charted a shot for, sorted by name so the
+  // index reads cleanly in the player dropdown.
+  const players = tablePlayers
+    .map((player) => ({
+      id: player.id,
+      name: player.name,
+      team: player.team,
+      shots: shotsById.get(player.id),
+    }))
+    .filter((player) => player.shots.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return { players, baseline: { cell: CELL_FT, zones: buildBaselineZones(league) } };
 }
@@ -291,9 +269,10 @@ function splitPair(text) {
   return [made || 0, attempted || 0];
 }
 
-// Per-player game logs for the trend chart and table on the player page. One
-// gamelog call per player; regular-season games only (matches the table).
-async function buildGameLogs(players) {
+// Per-player game logs for the trend chart and table on the player page. Reuses
+// the logs already fetched by fetchGamelogs; regular-season games only (matches
+// the table).
+async function buildGameLogs(players, gamelogs) {
   // Regular-season window, so the log matches the (regular-season) table and
   // excludes preseason and playoff games.
   const regularSeasonStart = "2025-10-21";
@@ -301,13 +280,8 @@ async function buildGameLogs(players) {
   let written = 0;
 
   for (const player of players) {
-    let log;
-    try {
-      log = await fetchJson(gamelogUrl(player.id));
-    } catch (error) {
-      console.warn(`  no game log for ${player.name}: ${error.message}`);
-      continue;
-    }
+    const log = gamelogs.get(player.id);
+    if (!log) continue;
 
     const names = log.names ?? [];
     const at = (statName) => names.indexOf(statName);
@@ -367,8 +341,13 @@ async function main() {
   await writeJson("src/data/shooting-stats.json", { season: SEASON_LABEL, players });
   console.log(`Wrote shooting stats for ${players.length} players`);
 
-  const featured = resolveFeatured(byathlete, teamNames);
-  const { players: withShots, baseline } = await buildShotMaps(featured);
+  // Fetch every table player's game log once, then reuse it for both the shot
+  // scan (which games to pull play-by-play for) and the per-player trend files.
+  console.log(`Fetching game logs for ${players.length} players...`);
+  const gamelogs = await fetchGamelogs(players);
+  const gameIds = collectGameIds(gamelogs);
+
+  const { players: withShots, baseline } = await buildShotMaps(players, gameIds);
   checkCalibration(withShots);
 
   const index = withShots.map(({ id, name, team, shots }) => ({
@@ -383,11 +362,10 @@ async function main() {
   }
   await writeJson("public/shots/league-baseline.json", baseline);
   console.log(
-    `Wrote shot maps for ${withShots.length} featured players and ${baseline.zones.length} league baseline cells`,
+    `Wrote shot maps for ${withShots.length} players and ${baseline.zones.length} league baseline cells`,
   );
 
-  console.log(`Fetching game logs for ${players.length} players...`);
-  const logs = await buildGameLogs(players);
+  const logs = await buildGameLogs(players, gamelogs);
   console.log(`Wrote ${logs} game logs`);
 }
 
