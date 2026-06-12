@@ -5,9 +5,12 @@
 // time and commit the result. Everything this writes is committed, so the
 // deployed app never depends on an external data host at request time.
 //
-// Two outputs:
-//   - src/data/shooting-stats.json: per-player season aggregates for the table.
-//   - public/shots/*.json:          per-shot coordinates for the featured charts.
+// Three data outputs:
+//   - src/data/shooting-stats.json:    table aggregates, players with 200+ FGA.
+//   - src/data/leaderboard-stats.json: same aggregates for the full league, so the
+//                                      leaderboards can rank every NBA player and
+//                                      apply NBA-style qualification at display time.
+//   - public/shots/*.json:             per-shot coordinates for the featured charts.
 //
 // Players are keyed by their ESPN athlete id throughout, so the table, the shot
 // index, and the shot files all line up.
@@ -32,8 +35,10 @@ const gamelogUrl = (id) =>
 const summaryUrl = (id) =>
   `https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
 
-// A player needs a real sample of attempts before per-game shooting splits mean
-// anything; this drops deep bench players who took a handful of shots all year.
+// The table needs a real sample of attempts before per-game shooting splits mean
+// anything, so it drops deep bench players who took a handful of shots all year.
+// The leaderboard dataset keeps everyone (qualification is applied per category at
+// display time), so this floor only gates the table, shot charts, and game logs.
 const MIN_ATTEMPTS = 200;
 
 // ESPN court coordinates are in feet with the rim at (25, 0) and both teams
@@ -113,11 +118,13 @@ async function buildTeamNames() {
   return new Map(teams.map(({ team }) => [String(team.id), team.displayName]));
 }
 
+// Aggregate every athlete ESPN returns. Callers decide which floor to apply: the
+// table keeps 200+ FGA, the leaderboards keep the whole league.
 function aggregatePlayers(byathlete, teamNames) {
   const stat = makeStatReader(byathlete.categories);
 
   return byathlete.athletes
-    .filter((entry) => stat(entry, "offensive", "fieldGoalsAttempted") >= MIN_ATTEMPTS)
+    .filter((entry) => stat(entry, "general", "gamesPlayed") >= 1)
     .map((entry) => {
       const { athlete } = entry;
       return {
@@ -350,7 +357,13 @@ async function main() {
   console.log(`Fetching ${SEASON_LABEL} player stats from ESPN...`);
   const [byathlete, teamNames] = await Promise.all([fetchJson(BYATHLETE_URL), buildTeamNames()]);
 
-  const players = aggregatePlayers(byathlete, teamNames);
+  const allPlayers = aggregatePlayers(byathlete, teamNames);
+  await writeJson("src/data/leaderboard-stats.json", { season: SEASON_LABEL, players: allPlayers });
+  console.log(`Wrote leaderboard stats for ${allPlayers.length} players`);
+
+  // The table, shot charts, and game logs all key off this smaller, higher-volume
+  // slice; the leaderboards rank the full league above.
+  const players = allPlayers.filter((player) => player.fga >= MIN_ATTEMPTS);
   await writeJson("src/data/shooting-stats.json", { season: SEASON_LABEL, players });
   console.log(`Wrote shooting stats for ${players.length} players`);
 

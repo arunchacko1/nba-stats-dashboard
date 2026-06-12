@@ -1,47 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { efgPct, tsPct, type ShootingStat } from "@/lib/shooting";
-
-interface Category {
-  id: string;
-  label: string;
-  value: (player: ShootingStat) => number;
-  format: (value: number) => string;
-  // Rate stats need a volume floor so a low-attempt player doesn't top the board.
-  qualifies?: (player: ShootingStat) => boolean;
-}
-
-const pct = (value: number) => `${value.toFixed(1)}%`;
-const oneDecimal = (value: number) => value.toFixed(1);
-
-const categories: Category[] = [
-  { id: "ppg", label: "Points / game", value: (p) => p.pointsPerGame, format: oneDecimal },
-  { id: "fg3m", label: "Threes made", value: (p) => p.fg3m, format: (v) => String(v) },
-  { id: "fgPct", label: "FG%", value: (p) => p.fgPct, format: pct },
-  {
-    id: "fg3Pct",
-    label: "3P%",
-    value: (p) => p.fg3Pct,
-    format: pct,
-    qualifies: (p) => p.fg3a >= 100,
-  },
-  { id: "ftPct", label: "FT%", value: (p) => p.ftPct, format: pct, qualifies: (p) => p.fta >= 100 },
-  { id: "efg", label: "eFG%", value: efgPct, format: pct },
-  { id: "ts", label: "TS%", value: tsPct, format: pct },
-  { id: "fga", label: "FGA / game", value: (p) => p.fgaPerGame, format: oneDecimal },
-];
+import { categories, qualificationContext, rankLeaders } from "@/lib/leaderboard";
+import type { ShootingStat } from "@/lib/shooting";
 
 export function Leaderboards({ players }: { players: ShootingStat[] }) {
   const [activeId, setActiveId] = useState(categories[0].id);
   const category = categories.find((c) => c.id === activeId) ?? categories[0];
 
-  const ranked = players
-    .filter(category.qualifies ?? (() => true))
-    .map((player) => ({ player, value: category.value(player) }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
+  const ctx = useMemo(() => qualificationContext(players), [players]);
+  const ranked = useMemo(() => rankLeaders(players, category, ctx), [players, category, ctx]);
 
   return (
     <div className="space-y-4">
@@ -61,6 +30,8 @@ export function Leaderboards({ players }: { players: ShootingStat[] }) {
           </button>
         ))}
       </div>
+
+      <p className="text-xs text-zinc-500">{category.note}</p>
 
       <ol className="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800">
         {ranked.map(({ player, value }, index) => (

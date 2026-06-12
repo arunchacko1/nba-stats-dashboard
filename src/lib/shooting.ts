@@ -38,7 +38,7 @@ export function tsPct(player: ShootingStat): number {
   return (player.points / (2 * shootingPossessions)) * 100;
 }
 
-const datasetSchema = z.object({
+export const datasetSchema = z.object({
   season: z.string(),
   players: z.array(shootingStatSchema),
 });
