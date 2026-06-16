@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PlayerHeadshot } from "@/components/PlayerHeadshot";
 import { PlayerShotChart } from "@/components/PlayerShotChart";
 import { PlayerTrends } from "@/components/PlayerTrends";
 import { getPlayerById, getShootingStats } from "@/lib/shooting";
@@ -30,10 +31,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <Link href="/players" className="text-sm text-zinc-400 transition-colors hover:text-white">
           ← Shooting Stats
         </Link>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">{player.name}</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          {player.team} · {player.games} games · {getShootingStats().season}
-        </p>
+        <div className="mt-2 flex items-center gap-4">
+          <PlayerHeadshot id={id} name={player.name} size={96} />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{player.name}</h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              {player.team} · {player.games} games · {getShootingStats().season}
+            </p>
+          </div>
+        </div>
       </header>
 
       <section>

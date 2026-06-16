@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   // the balldontlie free tier's rate limit that sweep waits out a couple of
   // ~60s throttles (~2 min total), so lift the default 60s page-generation cap.
   staticPageGenerationTimeout: 300,
+  // Player headshots are served by ESPN, keyed by the same athlete id as our data.
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "a.espncdn.com" }],
+  },
 };
 
 export default nextConfig;

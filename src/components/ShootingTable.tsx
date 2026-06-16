@@ -11,6 +11,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { efgPct, filterPlayers, teamOptions, tsPct, type ShootingStat } from "@/lib/shooting";
+import { PlayerHeadshot } from "./PlayerHeadshot";
 
 const columnHelper = createColumnHelper<ShootingStat>();
 
@@ -21,9 +22,10 @@ const columns = [
     cell: (c) => (
       <Link
         href={`/players/${c.row.original.id}`}
-        className="font-medium text-zinc-100 underline-offset-2 hover:text-white hover:underline"
+        className="flex items-center gap-2 font-medium text-zinc-100 hover:text-white"
       >
-        {c.getValue()}
+        <PlayerHeadshot id={c.row.original.id} name={c.getValue()} size={28} />
+        <span className="underline-offset-2 hover:underline">{c.getValue()}</span>
       </Link>
     ),
   }),

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { categories, qualificationContext, rankLeaders } from "@/lib/leaderboard";
 import type { ShootingStat } from "@/lib/shooting";
+import { PlayerHeadshot } from "./PlayerHeadshot";
 
 export function Leaderboards({ players }: { players: ShootingStat[] }) {
   const [activeId, setActiveId] = useState(categories[0].id);
@@ -37,6 +38,7 @@ export function Leaderboards({ players }: { players: ShootingStat[] }) {
         {ranked.map(({ player, value }, index) => (
           <li key={player.id} className="flex items-center gap-4 px-4 py-2.5 text-sm">
             <span className="w-5 text-right tabular-nums text-zinc-500">{index + 1}</span>
+            <PlayerHeadshot id={player.id} name={player.name} size={28} />
             <Link
               href={`/players/${player.id}`}
               className="flex-1 font-medium text-zinc-100 underline-offset-2 hover:text-white hover:underline"
