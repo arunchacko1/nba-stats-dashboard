@@ -126,6 +126,20 @@ function aggregatePlayers(byathlete, teamNames) {
         // the old shot-log source that only knew about field goals.
         pointsPerGame: round(stat(entry, "offensive", "avgPoints")),
         fgaPerGame: round(stat(entry, "offensive", "avgFieldGoalsAttempted")),
+        // Box-score breadth so the data isn't shooting-only. ESPN files rebounds
+        // and minutes under "general", assists/turnovers under "offensive", and
+        // steals/blocks under "defensive".
+        rebounds: stat(entry, "general", "rebounds"),
+        reboundsPerGame: round(stat(entry, "general", "avgRebounds")),
+        assists: stat(entry, "offensive", "assists"),
+        assistsPerGame: round(stat(entry, "offensive", "avgAssists")),
+        steals: stat(entry, "defensive", "steals"),
+        stealsPerGame: round(stat(entry, "defensive", "avgSteals")),
+        blocks: stat(entry, "defensive", "blocks"),
+        blocksPerGame: round(stat(entry, "defensive", "avgBlocks")),
+        turnovers: stat(entry, "offensive", "turnovers"),
+        turnoversPerGame: round(stat(entry, "offensive", "avgTurnovers")),
+        minutesPerGame: round(stat(entry, "general", "avgMinutes")),
       };
     })
     .sort((a, b) => b.pointsPerGame - a.pointsPerGame);
@@ -308,6 +322,10 @@ async function buildGameLogs(players, gamelogs) {
         fga,
         fg3m,
         fg3a,
+        rebounds: Number(stats[at("totalRebounds")]) || 0,
+        assists: Number(stats[at("assists")]) || 0,
+        steals: Number(stats[at("steals")]) || 0,
+        blocks: Number(stats[at("blocks")]) || 0,
       });
     }
 

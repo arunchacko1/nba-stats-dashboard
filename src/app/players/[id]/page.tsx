@@ -68,6 +68,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <Split label="3P%" value={`${player.fg3Pct.toFixed(1)}%`} />
           <Split label="FGM / FGA" value={`${player.fgm} / ${player.fga}`} />
           <Split label="3PM / 3PA" value={`${player.fg3m} / ${player.fg3a}`} />
+          <Split label="RPG" value={player.reboundsPerGame.toFixed(1)} />
+          <Split label="APG" value={player.assistsPerGame.toFixed(1)} />
+          <Split label="SPG" value={player.stealsPerGame.toFixed(1)} />
+          <Split label="BPG" value={player.blocksPerGame.toFixed(1)} />
         </dl>
         {percentiles && (
           <p className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-zinc-500">

@@ -21,6 +21,18 @@ export const shootingStatSchema = z.object({
   points: z.number(),
   pointsPerGame: z.number(),
   fgaPerGame: z.number(),
+  // Box-score breadth beyond shooting (season totals + per-game).
+  rebounds: z.number(),
+  reboundsPerGame: z.number(),
+  assists: z.number(),
+  assistsPerGame: z.number(),
+  steals: z.number(),
+  stealsPerGame: z.number(),
+  blocks: z.number(),
+  blocksPerGame: z.number(),
+  turnovers: z.number(),
+  turnoversPerGame: z.number(),
+  minutesPerGame: z.number(),
 });
 export type ShootingStat = z.infer<typeof shootingStatSchema>;
 

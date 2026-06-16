@@ -16,6 +16,10 @@ export const gameLogEntrySchema = z.object({
   fga: z.number(),
   fg3m: z.number(),
   fg3a: z.number(),
+  rebounds: z.number(),
+  assists: z.number(),
+  steals: z.number(),
+  blocks: z.number(),
 });
 export type GameLogEntry = z.infer<typeof gameLogEntrySchema>;
 
@@ -64,6 +68,8 @@ export const trendStats = {
     value: (g: GameLogEntry) => (g.fga > 0 ? (g.fgm / g.fga) * 100 : 0),
     format: (v: number) => `${v.toFixed(1)}%`,
   },
+  rebounds: { label: "Rebounds", value: (g: GameLogEntry) => g.rebounds, format: (v: number) => v.toFixed(0) },
+  assists: { label: "Assists", value: (g: GameLogEntry) => g.assists, format: (v: number) => v.toFixed(0) },
 } as const;
 
 export type TrendStatKey = keyof typeof trendStats;

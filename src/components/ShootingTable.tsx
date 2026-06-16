@@ -48,6 +48,10 @@ const columns = [
     header: "TS%",
     cell: (c) => c.getValue<number>().toFixed(1),
   }),
+  columnHelper.accessor("reboundsPerGame", { header: "RPG", cell: (c) => c.getValue().toFixed(1) }),
+  columnHelper.accessor("assistsPerGame", { header: "APG", cell: (c) => c.getValue().toFixed(1) }),
+  columnHelper.accessor("stealsPerGame", { header: "SPG", cell: (c) => c.getValue().toFixed(1) }),
+  columnHelper.accessor("blocksPerGame", { header: "BPG", cell: (c) => c.getValue().toFixed(1) }),
 ];
 
 const numericColumns = new Set([
@@ -61,6 +65,10 @@ const numericColumns = new Set([
   "ftPct",
   "efgPct",
   "tsPct",
+  "reboundsPerGame",
+  "assistsPerGame",
+  "stealsPerGame",
+  "blocksPerGame",
 ]);
 
 export function ShootingTable({ players }: { players: ShootingStat[] }) {

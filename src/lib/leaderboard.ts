@@ -113,6 +113,38 @@ export const categories: LeaderboardCategory[] = [
     qualifies: playedEnoughGames,
     note: GAMES_NOTE,
   },
+  {
+    id: "rpg",
+    label: "Rebounds / game",
+    value: (p) => p.reboundsPerGame,
+    format: oneDecimal,
+    qualifies: playedEnoughGames,
+    note: GAMES_NOTE,
+  },
+  {
+    id: "apg",
+    label: "Assists / game",
+    value: (p) => p.assistsPerGame,
+    format: oneDecimal,
+    qualifies: playedEnoughGames,
+    note: GAMES_NOTE,
+  },
+  {
+    id: "spg",
+    label: "Steals / game",
+    value: (p) => p.stealsPerGame,
+    format: oneDecimal,
+    qualifies: playedEnoughGames,
+    note: GAMES_NOTE,
+  },
+  {
+    id: "bpg",
+    label: "Blocks / game",
+    value: (p) => p.blocksPerGame,
+    format: oneDecimal,
+    qualifies: playedEnoughGames,
+    note: GAMES_NOTE,
+  },
 ];
 
 export interface RankedLeader {

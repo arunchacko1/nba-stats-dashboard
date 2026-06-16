@@ -14,6 +14,10 @@ export function GameLogTable({ games }: { games: GameLogEntry[] }) {
             <Th>Opp</Th>
             <Th>Res</Th>
             <Th right>PTS</Th>
+            <Th right>REB</Th>
+            <Th right>AST</Th>
+            <Th right>STL</Th>
+            <Th right>BLK</Th>
             <Th right>FG</Th>
             <Th right>3P</Th>
             <Th right>FG%</Th>
@@ -30,6 +34,10 @@ export function GameLogTable({ games }: { games: GameLogEntry[] }) {
                 {game.won ? "W" : "L"}
               </Td>
               <Td right>{game.points}</Td>
+              <Td right>{game.rebounds}</Td>
+              <Td right>{game.assists}</Td>
+              <Td right>{game.steals}</Td>
+              <Td right>{game.blocks}</Td>
               <Td right>
                 {game.fgm}-{game.fga}
               </Td>

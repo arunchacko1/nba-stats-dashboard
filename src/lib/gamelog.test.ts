@@ -12,6 +12,10 @@ function game(overrides: Partial<GameLogEntry>): GameLogEntry {
     fga: 0,
     fg3m: 0,
     fg3a: 0,
+    rebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
     ...overrides,
   };
 }
@@ -27,5 +31,10 @@ describe("trendStats", () => {
 
   it("reads points directly", () => {
     expect(trendStats.points.value(game({ points: 30 }))).toBe(30);
+  });
+
+  it("reads the box-score trend stats directly", () => {
+    expect(trendStats.rebounds.value(game({ rebounds: 12 }))).toBe(12);
+    expect(trendStats.assists.value(game({ assists: 9 }))).toBe(9);
   });
 });

@@ -21,6 +21,17 @@ function makeStat(overrides: Partial<ShootingStat>): ShootingStat {
     points: 1280,
     pointsPerGame: 12,
     fgaPerGame: 14,
+    rebounds: 400,
+    reboundsPerGame: 5,
+    assists: 300,
+    assistsPerGame: 4,
+    steals: 80,
+    stealsPerGame: 1,
+    blocks: 40,
+    blocksPerGame: 0.5,
+    turnovers: 200,
+    turnoversPerGame: 2.5,
+    minutesPerGame: 30,
     ...overrides,
   };
 }
@@ -79,6 +90,20 @@ describe("rankLeaders qualification (full season)", () => {
     expect(rankLeaders([reserve, starter], cat("ppg"), ctx).map((r) => r.player.id)).toEqual([
       "starter",
     ]);
+  });
+
+  it("ranks the box-score per-game boards and applies the games minimum", () => {
+    for (const [id, key] of [
+      ["rpg", "reboundsPerGame"],
+      ["apg", "assistsPerGame"],
+      ["spg", "stealsPerGame"],
+      ["bpg", "blocksPerGame"],
+    ] as const) {
+      const leader = makeStat({ id: "leader", games: 70, [key]: 12 });
+      const benchHotStreak = makeStat({ id: "bench", games: 20, [key]: 20 });
+      const ranked = rankLeaders([benchHotStreak, leader], cat(id), ctx);
+      expect(ranked.map((r) => r.player.id)).toEqual(["leader"]);
+    }
   });
 });
 

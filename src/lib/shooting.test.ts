@@ -143,6 +143,17 @@ function makeStat(overrides: Partial<ShootingStat>): ShootingStat {
     points: 1280,
     pointsPerGame: 12,
     fgaPerGame: 14,
+    rebounds: 350,
+    reboundsPerGame: 5,
+    assists: 280,
+    assistsPerGame: 4,
+    steals: 70,
+    stealsPerGame: 1,
+    blocks: 35,
+    blocksPerGame: 0.5,
+    turnovers: 180,
+    turnoversPerGame: 2.5,
+    minutesPerGame: 28,
     ...overrides,
   };
 }
