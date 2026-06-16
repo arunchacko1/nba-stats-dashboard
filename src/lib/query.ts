@@ -1,5 +1,5 @@
 import { getLeaderboardStats } from "@/lib/leaderboardData";
-import { efgPct, tsPct, type ShootingStat } from "@/lib/shooting";
+import { efgPct, getShootingStats, tsPct, type ShootingStat } from "@/lib/shooting";
 import {
   categories,
   qualificationContext,
@@ -184,4 +184,43 @@ export function teamProfile(team: string): TeamProfile {
     .players.filter((player) => player.team === team)
     .sort((a, b) => b.pointsPerGame - a.pointsPerGame);
   return { team, count: players.length, topScorer: players[0] ?? null, players };
+}
+
+// Percentiles are computed against the qualified shooters in the table set (the
+// 200+ FGA group), which is a meaningful population for rate stats rather than the
+// full league's long tail of low-minute players.
+const PERCENTILE_STATS = ["pointsPerGame", "fgPct", "fg3Pct", "ftPct", "efg", "ts"] as const;
+export type PercentileStat = (typeof PERCENTILE_STATS)[number];
+
+function metric(player: ShootingStat, key: PercentileStat): number {
+  if (key === "efg") return efgPct(player);
+  if (key === "ts") return tsPct(player);
+  return player[key];
+}
+
+// Midrank percentile: share of the population below `value`, counting ties as
+// half. Pure, so it's unit tested directly.
+export function percentileRank(values: number[], value: number): number {
+  if (values.length === 0) return 0;
+  let below = 0;
+  let equal = 0;
+  for (const v of values) {
+    if (v < value) below += 1;
+    else if (v === value) equal += 1;
+  }
+  return ((below + 0.5 * equal) / values.length) * 100;
+}
+
+// Where a player ranks among table shooters on each rate/scoring stat. Returns
+// null for players outside that population (e.g. very low-volume).
+export function playerPercentiles(id: string): Record<PercentileStat, number> | null {
+  const population = getShootingStats().players;
+  const player = population.find((p) => p.id === id);
+  if (!player) return null;
+  const result = {} as Record<PercentileStat, number>;
+  for (const key of PERCENTILE_STATS) {
+    const values = population.map((p) => metric(p, key));
+    result[key] = percentileRank(values, metric(player, key));
+  }
+  return result;
 }

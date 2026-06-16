@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ShotChart } from "@/components/ShotChart";
 import { ShotControls, defaultShotOptions, type ShotChartOptions } from "@/components/ShotControls";
 import { ShotChartLegend, ShotSummaryStats } from "@/components/shotChartUi";
+import { ZoneSplits } from "@/components/ZoneSplits";
 import { useLeagueBaseline } from "@/lib/useLeagueBaseline";
 import { usePlayerShots } from "@/lib/usePlayerShots";
 
@@ -42,6 +43,7 @@ export function PlayerShotChart({ playerId }: { playerId: string }) {
           leagueAvailable={baseline !== null}
         />
         <ShotChartLegend colorMode={options.colorMode} />
+        <ZoneSplits shots={shots} />
       </div>
     </div>
   );

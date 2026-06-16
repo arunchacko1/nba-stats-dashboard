@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   matchTeam,
   normalizeName,
+  percentileRank,
   rankPlayerMatches,
   topPlayersBy,
 } from "./query";
@@ -88,5 +89,22 @@ describe("topPlayersBy (real data)", () => {
 
   it("throws on an unknown stat", () => {
     expect(() => topPlayersBy("bogus")).toThrow(/Unknown stat/);
+  });
+});
+
+describe("percentileRank", () => {
+  const values = [10, 20, 30, 40, 50];
+
+  it("puts the maximum near the top and the minimum near the bottom", () => {
+    expect(percentileRank(values, 50)).toBe(90); // 4 below + half of itself
+    expect(percentileRank(values, 10)).toBe(10);
+  });
+
+  it("places the median in the middle", () => {
+    expect(percentileRank(values, 30)).toBe(50);
+  });
+
+  it("returns 0 for an empty population", () => {
+    expect(percentileRank([], 5)).toBe(0);
   });
 });

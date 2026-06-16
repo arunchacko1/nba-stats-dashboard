@@ -4,7 +4,23 @@ import { PlayerHeadshot } from "@/components/PlayerHeadshot";
 import { PlayerShotChart } from "@/components/PlayerShotChart";
 import { PlayerTrends } from "@/components/PlayerTrends";
 import { getPlayerById, getShootingStats } from "@/lib/shooting";
+import { playerPercentiles } from "@/lib/query";
 import { hasShotMap } from "@/lib/shotIndex";
+
+// 84 -> "84th", 1 -> "1st". Ranks are rounded for display.
+function ordinal(value: number): string {
+  const n = Math.round(value);
+  const suffixes = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
+}
+
+const PERCENTILE_LABELS: { key: "pointsPerGame" | "ts" | "efg" | "fg3Pct"; label: string }[] = [
+  { key: "pointsPerGame", label: "PPG" },
+  { key: "ts", label: "TS%" },
+  { key: "efg", label: "eFG%" },
+  { key: "fg3Pct", label: "3P%" },
+];
 
 export function generateStaticParams() {
   return getShootingStats().players.map((player) => ({ id: player.id }));
@@ -24,6 +40,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   if (!player) notFound();
 
   const showChart = hasShotMap(id);
+  const percentiles = playerPercentiles(id);
 
   return (
     <div className="space-y-8">
@@ -52,6 +69,19 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <Split label="FGM / FGA" value={`${player.fgm} / ${player.fga}`} />
           <Split label="3PM / 3PA" value={`${player.fg3m} / ${player.fg3a}`} />
         </dl>
+        {percentiles && (
+          <p className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-zinc-500">
+            <span>League rank among rotation shooters:</span>
+            {PERCENTILE_LABELS.map(({ key, label }) => (
+              <span key={key}>
+                {label}{" "}
+                <strong className="font-semibold text-zinc-300">
+                  {ordinal(percentiles[key])}
+                </strong>
+              </span>
+            ))}
+          </p>
+        )}
       </section>
 
       <section>
