@@ -2,7 +2,7 @@ import { ShotExplorer } from "@/components/ShotExplorer";
 import { SHOOTING_SEASON_LABEL } from "@/lib/season";
 
 export const metadata = {
-  title: "Shot Charts — NBA Shooting Dashboard",
+  title: "Shot Charts — NBA Stats Dashboard",
 };
 
 export default function ShotChartPage() {

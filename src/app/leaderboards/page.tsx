@@ -2,7 +2,7 @@ import { Leaderboards } from "@/components/Leaderboards";
 import { getLeaderboardStats } from "@/lib/leaderboardData";
 
 export const metadata = {
-  title: "Leaderboards — NBA Shooting Dashboard",
+  title: "Leaderboards — NBA Stats Dashboard",
 };
 
 export default function LeaderboardsPage() {

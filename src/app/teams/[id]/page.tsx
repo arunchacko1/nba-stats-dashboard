@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const team = getTeamById(Number(id));
   return {
-    title: team ? `${team.full_name} — NBA Shooting Dashboard` : "Team not found",
+    title: team ? `${team.full_name} — NBA Stats Dashboard` : "Team not found",
   };
 }
 

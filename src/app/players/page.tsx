@@ -2,7 +2,7 @@ import { ShootingTable } from "@/components/ShootingTable";
 import { getShootingStats } from "@/lib/shooting";
 
 export const metadata = {
-  title: "Shooting Stats — NBA Shooting Dashboard",
+  title: "Shooting Stats — NBA Stats Dashboard",
 };
 
 export default function PlayersPage() {

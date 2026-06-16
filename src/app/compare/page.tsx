@@ -3,7 +3,7 @@ import { getShootingStats } from "@/lib/shooting";
 import { getShotPlayerIds } from "@/lib/shotIndex";
 
 export const metadata = {
-  title: "Compare Players — NBA Shooting Dashboard",
+  title: "Compare Players — NBA Stats Dashboard",
 };
 
 export default async function ComparePage({

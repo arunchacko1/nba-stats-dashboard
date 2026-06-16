@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const player = getPlayerById(id);
   return {
-    title: player ? `${player.name} — NBA Shooting Dashboard` : "Player not found",
+    title: player ? `${player.name} — NBA Stats Dashboard` : "Player not found",
   };
 }
 

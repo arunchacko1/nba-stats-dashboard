@@ -13,7 +13,7 @@ export function SiteHeader() {
     <header className="border-b border-zinc-800 bg-zinc-950">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <Link href="/" className="text-lg font-bold tracking-tight text-white">
-          NBA Shooting Dashboard
+          NBA Stats Dashboard
         </Link>
         <nav className="flex gap-6 text-sm font-medium text-zinc-400">
           {links.map((link) => (
